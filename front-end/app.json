@@ -1,0 +1,63 @@
+{
+  "expo": {
+    "name": "LabourLine",
+    "slug": "LabourLine",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./images/icon.png",
+    "logo": "./images/app-logo.png",
+    "scheme": "labourline",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "app/src/images/android-icon-foreground.png",
+        "backgroundImage": "app/src/images/android-icon-background.png",
+        "monochromeImage": "app/src/images/android-icon-monochrome.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.LabourLine.LabourLine",
+      "googleServicesFile": "./google-services.json",
+
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBr4B2M8dg7N7rhHmvJBK0uHyPazfLwMjg"
+        }
+      }
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "app/src/images/shram-bg.png",
+          "imageWidth": 200,
+          "resizeMode": "cover",
+          "backgroundColor": "#FED8A8",
+          "dark": {
+            "backgroundColor": "#1a1a1a"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0a8b96dd-4938-4dc1-a248-38a24a5867a5"
+      }
+    }
+  }
+}

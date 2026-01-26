@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "354896503054",
+    "firebase_url": "https://demapplication-476a2-default-rtdb.firebaseio.com",
+    "project_id": "demapplication-476a2",
+    "storage_bucket": "demapplication-476a2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:354896503054:android:4415f8acc4a991ef71375f",
+        "android_client_info": {
+          "package_name": "com.LabourLine.LabourLine"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAhNNG5wVSHFm4ZkI2EFGHaHkDpkMmkncY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:354896503054:android:55f478786be79d0771375f",
+        "android_client_info": {
+          "package_name": "com.example.demapplication"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAhNNG5wVSHFm4ZkI2EFGHaHkDpkMmkncY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:354896503054:android:d4f84af770d3da6371375f",
+        "android_client_info": {
+          "package_name": "com.soja.autodry_user"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAhNNG5wVSHFm4ZkI2EFGHaHkDpkMmkncY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
