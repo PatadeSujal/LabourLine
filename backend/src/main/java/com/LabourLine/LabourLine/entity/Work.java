@@ -4,9 +4,13 @@ import com.LabourLine.LabourLine.entity.type.WorkStatus;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 @Entity
 @Data
+@Getter
+@Setter
 public class Work {
 
     @Id
@@ -33,6 +37,9 @@ public class Work {
     private Double longitude; // e.g., 73.8567
     
     private String image; 
+
+
+    private String audioUrl;
 
     @Enumerated(EnumType.STRING)
     private WorkStatus status;

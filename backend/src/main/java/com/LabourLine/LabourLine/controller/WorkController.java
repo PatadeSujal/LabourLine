@@ -35,7 +35,7 @@ public class WorkController {
 
         // 1. Find the Employer (User) who is posting this
         Optional<User> employerOpt = userRepository.findById(workDto.getEmployerId());
-
+        System.out.println(workDto);
         if (employerOpt.isEmpty()) {
             return ResponseEntity.badRequest().body("Employer not found with ID: " + workDto.getEmployerId());
         }
@@ -51,12 +51,13 @@ public class WorkController {
         work.setImage(workDto.getImage());
         work.setLatitude(workDto.getLatitude());
         work.setLongitude(workDto.getLongitude());
-
+        work.setAudioUrl(workDto.getAudioUrl());
         // 3. Set Default Status
         work.setStatus(WorkStatus.OPEN);
-
+        System.out.println("Hello");
+System.out.println("Audio url" + work.getAudioUrl());
         // 4. Save to Database
-        Work savedWork = workRepository.save(work);
+        Work savedWork = workRepository.save(work); 
 
         return ResponseEntity.ok(savedWork);
     }

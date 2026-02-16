@@ -50,4 +50,18 @@ public class SecurityConfig {
 
         return http.build();
     }
+
+    @Bean
+@Order(0) // Highest priority: check for files first
+public SecurityFilterChain fileFilterChain(HttpSecurity http) throws Exception {
+    http
+        .securityMatcher("/files/**") // Match the virtual path you defined in WebConfig
+        .csrf(csrf -> csrf.disable())
+        .authorizeHttpRequests(auth -> auth.anyRequest().permitAll()) // Make audio public
+        .sessionManagement(session -> 
+            session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+        );
+
+    return http.build();
+}
 }

@@ -58,12 +58,14 @@ public class EmployerController {
 @GetMapping("/work-status/{workId}")
 public ResponseEntity<?> getWorkStatus(@RequestParam("workId") Long workId){
     Optional<WorkAccepted> acceptedOpt = workAcceptedRepository.findByWorkId(workId);
-    
+    System.out.println(acceptedOpt);
+    System.out.println("Hello");
     if (acceptedOpt.isPresent()) {
         return ResponseEntity.ok(acceptedOpt.get());
     }
     
     Optional<Work> workOpt = workRepository.findById(workId);
+    System.out.println(workOpt);
     if (workOpt.isPresent()) {
         return ResponseEntity.ok(java.util.Map.of("work", workOpt.get(), "status", "OPEN"));
     }

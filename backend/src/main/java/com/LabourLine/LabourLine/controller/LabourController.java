@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.LabourLine.LabourLine.entity.LabourDetails;
+import com.LabourLine.LabourLine.entity.LabourLocation;
 import com.LabourLine.LabourLine.entity.User;
 import com.LabourLine.LabourLine.entity.WorkAccepted;
 import com.LabourLine.LabourLine.entity.type.WorkAcceptedStatus;
@@ -24,9 +25,9 @@ public class LabourController {
     private final WorkAcceptedRepository workAcceptedRepository; // 2. Declare the repository
 
     // 3. Update Constructor to inject ALL dependencies
-    public LabourController(LabourService labourService, 
-                            UserRepository userRepository, 
-                            WorkAcceptedRepository workAcceptedRepository) {
+    public LabourController(LabourService labourService,
+            UserRepository userRepository,
+            WorkAcceptedRepository workAcceptedRepository) {
         this.labourService = labourService;
         this.userRepository = userRepository;
         this.workAcceptedRepository = workAcceptedRepository;
@@ -50,15 +51,40 @@ public class LabourController {
             return ResponseEntity.badRequest().body("Labour not found");
         }
 
-        // Check for active work
-        // Now this will work because workAcceptedRepository is injected
-        Optional<WorkAccepted> activeWork = workAcceptedRepository.findByLabourIdAndStatus(labourId, WorkAcceptedStatus.ACCEPTED);
+        Optional<WorkAccepted> activeWork = workAcceptedRepository.findByLabourIdAndStatus(labourId,
+                WorkAcceptedStatus.ACCEPTED);
 
         if (activeWork.isPresent()) {
             return ResponseEntity.ok(activeWork.get());
         } else {
-            // Return 204 No Content if they are free
             return ResponseEntity.noContent().build();
         }
     }
+
+    @PostMapping("/update-location")
+    public ResponseEntity<?> updateLocation(@RequestBody LabourLocation request) {
+        System.out.println("Last Location " + request.getLastLatitude());
+        // Update the Labourer record with new Lat/Lng
+        labourService.updateCurrentLocation(
+                request.getLabourId(),
+                73.8636,
+                18.5018);
+        return ResponseEntity.ok().build();
+    }
+
+@GetMapping("/{labourId}")
+public ResponseEntity<LabourLocation> getLabourLocation(@PathVariable Long labourId) {
+    // 1. Fetch the location
+    LabourLocation loc = labourService.getLabourLocation(labourId);
+    
+    // 2. CHECK if it exists BEFORE accessing data
+    if (loc != null) {
+        System.out.println("Labour Found! Latitude: " + loc.getLastLatitude());
+        return ResponseEntity.ok(loc);
+    }
+    
+    // 3. If null, print that it wasn't found and return 404
+    System.out.println("No location found for Labour ID: " + labourId);
+    return ResponseEntity.notFound().build();
+}
 }
