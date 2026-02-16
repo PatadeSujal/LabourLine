@@ -26,7 +26,7 @@ export default function TabLayout() {
       const labourId = decoded.id;
 
       const response = await fetch(
-        `http://10.62.29.175:8080/labour/active-work/${labourId}`,
+        `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/labour/active-work/${labourId}`,
         {
           method: "GET",
           headers: { Authorization: `Bearer ${token}` },

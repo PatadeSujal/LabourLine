@@ -32,8 +32,8 @@ const ProfileScreen = () => {
       const decoded = jwtDecode(token);
       const userId = decoded.id;
 
-      // Use your machine's IP address (e.g., 10.62.29.175)
-      const API_URL = `http://10.62.29.175:8080/user/${userId}/labour-profile`;
+      // Use your machine's IP address (e.g., 10.198.221.175)
+      const API_URL = `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/user/${userId}/labour-profile`;
 
       const response = await fetch(API_URL, {
         method: "GET",

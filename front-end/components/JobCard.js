@@ -1,19 +1,127 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Audio } from "expo-av";
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
+import {
+  Alert,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import {
+  calculateDistance,
+  getUserCoordinates,
+} from "../app/src/store/locationUtils";
+import { acceptWorkApi } from "../app/src/store/workService";
 
-const JobCard = ({ job, onAccept, mainText }) => {
-  // Logic to parse duration from description if present
+// Added new prop 'onPressAction' for the "other function" logic
+const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
+  const [distanceText, setDistanceText] = useState("Locating...");
+  const [sound, setSound] = useState(null);
+  const [loading, setLoading] = useState(true);
+  // --- 1. NEW BUTTON HANDLER LOGIC ---
+  const handleButtonPress = () => {
+    if (mainText === "View Status") {
+      // Case 1: If text is "Status", run onAccept (as requested)
+      if (onAccept) onAccept(job.id);
+    } else {
+      // Case 2: Else run "other function" (passed via onPressAction prop)
+      // if (onPressAction) {
+      handleAcceptWork(job.id);
+      // }
+    }
+  };
+  const handleAcceptWork = async (workId) => {
+    setLoading(true);
+    try {
+      // Call the generalized API function
+      const acceptedWorkData = await acceptWorkApi(workId);
+
+      Alert.alert("Success", "Work Accepted!");
+
+      // Navigate using the returned data
+      router.push({
+        pathname: "/src/screens/WorkStatusScreen",
+        params: {
+          workData: JSON.stringify(acceptedWorkData),
+        },
+      });
+    } catch (error) {
+      Alert.alert("Failed", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  // ... (Rest of your existing logic remains the same)
+  useEffect(() => {
+    let isMounted = true;
+    const getDistance = async () => {
+      try {
+        const userCords = await getUserCoordinates();
+        if (isMounted && userCords && job.latitude && job.longitude) {
+          const dist = calculateDistance(
+            userCords.latitude,
+            userCords.longitude,
+            job.latitude,
+            job.longitude,
+          );
+          setDistanceText(`${dist} km`);
+        } else if (isMounted) {
+          setDistanceText(job.location ? job.location.split(",")[0] : "Pune");
+        }
+      } catch (err) {
+        if (isMounted) setDistanceText("Pune");
+      }
+    };
+    getDistance();
+    return () => {
+      isMounted = false;
+    };
+  }, [job.latitude, job.longitude]);
+
+  async function playSound() {
+    const audioUrl = job.audioUrl;
+    if (!audioUrl || audioUrl === "none") {
+      Alert.alert("No Audio", "This job has no voice description.");
+      return;
+    }
+    try {
+      if (sound) await sound.unloadAsync();
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: audioUrl },
+        { shouldPlay: true },
+      );
+      setSound(newSound);
+      newSound.setOnPlaybackStatusUpdate(async (status) => {
+        if (status.didJustFinish) {
+          await newSound.unloadAsync();
+          setSound(null);
+        }
+      });
+    } catch (error) {
+      Alert.alert("Error", "Could not play audio.");
+    }
+  }
+
+  useEffect(() => {
+    return sound
+      ? () => {
+          sound.unloadAsync();
+        }
+      : undefined;
+  }, [sound]);
+
   const getDuration = () => {
     if (job.description?.includes("Duration:")) {
       return job.description.split(".")[0].replace("Duration: ", "") + " Hrs";
     }
-    // Fallback if the duration prop was passed directly from the screen mapper
     return job.duration || "8 Hrs";
   };
 
   return (
     <View style={styles.card}>
-      {/* Header: Category and Status/Time */}
       <View style={styles.cardHeader}>
         <View style={styles.tagContainer}>
           <Text style={styles.tagText}>
@@ -24,7 +132,6 @@ const JobCard = ({ job, onAccept, mainText }) => {
       </View>
 
       <View style={styles.contentRow}>
-        {/* Left: Job Image & Location Badge */}
         <View style={styles.imageContainer}>
           <Image
             source={{ uri: job.image || "https://via.placeholder.com/150" }}
@@ -33,15 +140,11 @@ const JobCard = ({ job, onAccept, mainText }) => {
           />
           <View style={styles.distanceBadge}>
             <Text style={styles.distanceText} numberOfLines={1}>
-              {/* Handles "Pune, Maharashtra" -> "Pune" */}
-              {job.location
-                ? job.location.split(",")[0]
-                : job.distance || "Pune"}
+              {distanceText}
             </Text>
           </View>
         </View>
 
-        {/* Right: Job Details */}
         <View style={styles.detailsContainer}>
           <Text style={styles.title} numberOfLines={1}>
             {job.title}
@@ -50,18 +153,16 @@ const JobCard = ({ job, onAccept, mainText }) => {
             {job.description}
           </Text>
 
-          {/* Info Row: Duration & Audio */}
           <View style={styles.infoRow}>
             <View style={styles.durationBadge}>
               <Icon name="clock-outline" size={14} color="#555" />
               <Text style={styles.durationText}>{getDuration()}</Text>
             </View>
-            <TouchableOpacity style={styles.audioButton}>
+            <TouchableOpacity style={styles.audioButton} onPress={playSound}>
               <Icon name="volume-high" size={18} color="#1B1464" />
             </TouchableOpacity>
           </View>
 
-          {/* Footer: Earning & Action */}
           <View style={styles.footerRow}>
             <View>
               <Text style={styles.earningLabel}>Earning</Text>
@@ -73,9 +174,10 @@ const JobCard = ({ job, onAccept, mainText }) => {
             <TouchableOpacity
               style={[
                 styles.acceptButton,
-                mainText === "Status" && styles.statusButton, // Style change for Employer view
+                mainText === "Status" && styles.statusButton,
               ]}
-              onPress={() => onAccept(job.id)}
+              // UPDATED: Using the new handler logic
+              onPress={handleButtonPress}
               activeOpacity={0.8}
             >
               <Text style={styles.acceptText}>{mainText || "Accept"}</Text>
@@ -155,7 +257,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   earningLabel: { fontSize: 10, color: "#888" },
-  earningValue: { fontSize: 18, fontWeight: "bold", color: "#2ecc71" }, // Green for money
+  earningValue: { fontSize: 18, fontWeight: "bold", color: "#2ecc71" },
   acceptButton: {
     backgroundColor: "#1B1464",
     paddingVertical: 8,
@@ -163,7 +265,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   statusButton: {
-    backgroundColor: "#FF9F43", // Distinct color for "You Posted" screen
+    backgroundColor: "#FF9F43",
   },
   acceptText: { color: "#fff", fontSize: 13, fontWeight: "bold" },
 });

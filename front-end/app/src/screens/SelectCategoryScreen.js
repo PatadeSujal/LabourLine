@@ -14,6 +14,7 @@ import { workCategories } from "../../src/store/WorkData";
 
 const SelectCategoryScreen = () => {
   const handleCategorySelect = (category) => {
+    
     // 2. PASS DATA TO NEXT SCREEN
     // We pass the specific subCategories for the clicked item
     router.push({

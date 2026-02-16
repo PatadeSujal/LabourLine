@@ -1,14 +1,15 @@
 import { FontAwesome5, MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Audio } from "expo-av";
+import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
-import { useState } from "react";
+import { useState } from "react"; // Added useEffect
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
-  Modal,
+  Image,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -18,16 +19,34 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { workCategories } from "../src/store/WorkData";
+import CategoryFilterModal from "../../components/RenderModal";
+// IMPORT YOUR PRICING DATA HERE
+import {
+  labourLinePricing,
+  uploadToImgBB,
+  workCategories,
+} from "../src/store/WorkData";
+import {
+  getAddressFromCoords,
+  getUserCoordinates,
+} from "../src/store/locationUtils";
 
 const PostNewWorkScreen = () => {
   const [jobTitle, setJobTitle] = useState("");
   const [category, setCategory] = useState("");
   const [duration, setDuration] = useState("");
-  const [mobileNumber, setMobileNumber] = useState("");
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+
+  // --- NEW STATE FOR PRICING ENGINE ---
+  const [selectedSubCategoryData, setSelectedSubCategoryData] = useState(null);
+  const [pricingModel, setPricingModel] = useState("manual"); // 'manual', 'shift', 'measurement', 'task'
+
+  // Specific inputs for different models
+  const [measurementInput, setMeasurementInput] = useState(""); // For Sq Ft / Acres
+  const [shiftType, setShiftType] = useState("fullDay"); // 'fullDay' or 'halfDay'
+  const [selectedTaskItems, setSelectedTaskItems] = useState([]); // For Electrician/Plumber items
 
   // Location State
   const [locationMode, setLocationMode] = useState("current");
@@ -35,56 +54,192 @@ const PostNewWorkScreen = () => {
   const [coordinates, setCoordinates] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
 
-  // --- NEW LOGOUT FUNCTION ---
-  const handleLogout = () => {
-    Alert.alert("Logout", "Are you sure you want to log out?", [
-      { text: "Cancel", style: "cancel" },
+  // Media State
+  const [image, setImage] = useState(null);
+  const [recording, setRecording] = useState(null);
+  const [audioUri, setAudioUri] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+
+  // ... (Keep existing Audio/Image functions: startRecording, stopRecording, pickImage, handleLogout) ...
+  async function startRecording() {
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      if (permission.status === "granted") {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+        });
+
+        const { recording } = await Audio.Recording.createAsync(
+          Audio.RecordingOptionsPresets.HIGH_QUALITY,
+        );
+        setRecording(recording);
+        setIsRecording(true);
+      } else {
+        Alert.alert("Permission to access microphone is required!");
+      }
+    } catch (err) {
+      console.error("Failed to start recording", err);
+    }
+  }
+
+  async function stopRecording() {
+    try {
+      setIsRecording(false);
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setAudioUri(uri);
+      setRecording(null);
+    } catch (error) {
+      console.error("Stop recording error", error);
+    }
+  }
+
+  const pickImage = async () => {
+    Alert.alert("Upload Image", "Choose an option", [
       {
-        text: "Logout",
-        style: "destructive",
+        text: "Camera",
         onPress: async () => {
-          try {
-            await AsyncStorage.removeItem("userToken");
-            // Use replace to prevent going back to this screen
-            router.replace("src/screens/LoginScreen");
-          } catch (e) {
-            console.error("Logout failed", e);
-          }
+          const permission = await ImagePicker.requestCameraPermissionsAsync();
+          if (permission.status !== "granted")
+            return Alert.alert("Permission denied");
+          const result = await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 0.5,
+          });
+          if (!result.canceled) setImage(result.assets[0].uri);
         },
       },
+      {
+        text: "Gallery",
+        onPress: async () => {
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 0.5,
+          });
+          if (!result.canceled) setImage(result.assets[0].uri);
+        },
+      },
+      { text: "Cancel", style: "cancel" },
     ]);
+  };
+
+  const handleLogout = async () => {
+    await AsyncStorage.removeItem("userToken");
+    router.replace("/src/screens/LoginScreen");
   };
 
   const handleGetCurrentLocation = async () => {
     setIsLocating(true);
     try {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permission to access location was denied");
-        setIsLocating(false);
-        return;
-      }
-
-      let location = await Location.getCurrentPositionAsync({});
-      const { latitude, longitude } = location.coords;
-
-      setCoordinates({ latitude, longitude });
-
-      let reverseGeocode = await Location.reverseGeocodeAsync({
-        latitude,
-        longitude,
-      });
-      if (reverseGeocode.length > 0) {
-        const addr = reverseGeocode[0];
-        const formattedAddress = `${addr.name || ""} ${addr.street || ""}, ${addr.city}, ${addr.region}`;
-        setAddress(formattedAddress);
+      const coords = await getUserCoordinates();
+      if (coords) {
+        setCoordinates(coords);
+        const fullAddress = await getAddressFromCoords(
+          coords.latitude,
+          coords.longitude,
+        );
+        if (fullAddress) {
+          setAddress(fullAddress);
+        }
       }
     } catch (error) {
-      console.log(error);
-      Alert.alert("Error", "Could not fetch location. Please enter manually.");
+      console.error("Location handling error:", error);
+      Alert.alert("Error", "Could not complete location detection.");
     } finally {
       setIsLocating(false);
     }
+  };
+
+  // --- NEW: LOGIC TO FIND PRICING MODEL FROM CATEGORY LABEL ---
+  const handleCategorySelection = (label) => {
+    setCategory(label);
+    setModalVisible(false);
+
+    // Reset pricing states
+    setMeasurementInput("");
+    setShiftType("fullDay");
+    setSelectedTaskItems([]);
+    setAmount("");
+
+    // Find the deep object in labourLinePricing
+    let foundSub = null;
+    if (labourLinePricing) {
+      for (const mainCat of labourLinePricing) {
+        const sub = mainCat.subCategories.find((s) => s.label === label);
+        if (sub) {
+          foundSub = sub;
+          break;
+        }
+      }
+    }
+
+    if (foundSub && foundSub.pricing) {
+      setSelectedSubCategoryData(foundSub);
+      setPricingModel(foundSub.pricing.model);
+
+      // Auto-set initial amount if it's shift based
+      if (foundSub.pricing.model === "shift") {
+        setAmount(foundSub.pricing.rates.fullDay.toString());
+        setDuration("8 Hours");
+      }
+    } else {
+      // Fallback to manual if no pricing data found
+      setPricingModel("manual");
+      setSelectedSubCategoryData(null);
+    }
+  };
+
+  // --- NEW: DYNAMIC PRICE CALCULATORS ---
+
+  // 1. Shift Calculator
+  const handleShiftSelect = (type) => {
+    setShiftType(type);
+    if (selectedSubCategoryData) {
+      const rates = selectedSubCategoryData.pricing.rates;
+      const price = type === "fullDay" ? rates.fullDay : rates.halfDay;
+      setAmount(price.toString());
+      setDuration(type === "fullDay" ? "8 Hours" : "4 Hours");
+    }
+  };
+
+  // 2. Measurement Calculator (Sq Ft / Acres)
+  const handleMeasurementChange = (val) => {
+    setMeasurementInput(val);
+    if (val && selectedSubCategoryData) {
+      const rate = selectedSubCategoryData.pricing.baseRate;
+      const total = parseFloat(val) * rate;
+      const final = Math.max(
+        total,
+        selectedSubCategoryData.pricing.minJobValue || 0,
+      );
+      setAmount(final.toString());
+      setDuration("Task Based");
+    } else {
+      setAmount("");
+    }
+  };
+
+  // 3. Task Menu Calculator
+  const toggleTaskItem = (item, price) => {
+    // Simple toggle logic for demo
+    const exists = selectedTaskItems.find((i) => i.item === item);
+    let updatedList = [];
+    if (exists) {
+      updatedList = selectedTaskItems.filter((i) => i.item !== item);
+    } else {
+      updatedList = [...selectedTaskItems, { item, price }];
+    }
+    setSelectedTaskItems(updatedList);
+
+    // Recalculate Total
+    let total = selectedSubCategoryData.pricing.visitCharge || 0;
+    updatedList.forEach((t) => (total += t.price));
+    setAmount(total.toString());
+    setDuration("Task Based");
   };
 
   const handlePostWork = async () => {
@@ -93,169 +248,286 @@ const PostNewWorkScreen = () => {
       return;
     }
 
-    setLoading(true);
+    if (locationMode === "manual" && !address.trim()) {
+      Alert.alert("Error", "Please enter a valid address.");
+      return;
+    }
 
+    setLoading(true);
     try {
+      const token = await AsyncStorage.getItem("userToken");
+      const decoded = jwtDecode(token);
+
       let finalLat = coordinates?.latitude;
       let finalLng = coordinates?.longitude;
 
       if (locationMode === "manual") {
-        if (!address) {
-          Alert.alert("Error", "Please enter an address.");
-          setLoading(false);
-          return;
-        }
-
         try {
           const geocodedLocation = await Location.geocodeAsync(address);
           if (geocodedLocation.length > 0) {
             finalLat = geocodedLocation[0].latitude;
             finalLng = geocodedLocation[0].longitude;
           } else {
-            console.warn("Could not geocode address");
+            setLoading(false);
+            Alert.alert("Location Error", "Could not find coordinates.");
+            return;
           }
         } catch (e) {
-          console.error("Geocoding failed", e);
-        }
-      } else {
-        if (!finalLat || !finalLng) {
-          Alert.alert(
-            "Error",
-            "Please click 'Detect Location' or enter address manually.",
-          );
+          console.error(e);
           setLoading(false);
           return;
         }
       }
 
-      const token = await AsyncStorage.getItem("userToken");
-      if (!token) {
-        Alert.alert("Error", "Session expired. Please login again.");
-        return;
+      if (!finalLat || !finalLng) {
+        finalLat = 18.5204;
+        finalLng = 73.8567;
       }
 
-      const decoded = jwtDecode(token);
-      const employerId = decoded.id;
+      const uploadAudioMedia = async (uri) => {
+        const formData = new FormData();
+        const filename = uri.split("/").pop();
+        formData.append("file", { uri, name: filename, type: "audio/m4a" });
+        const uploadResponse = await fetch(
+          `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/upload/media`,
+          {
+            method: "POST",
+            body: formData,
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        if (uploadResponse.ok) {
+          const result = await uploadResponse.json();
+          return result.url;
+        }
+        return "none";
+      };
+
+      let finalAudioUrl = "none";
+      let finalImageUrl =
+        "https://img.freepik.com/free-vector/construction-worker-concept-illustration_114360-5093.jpg"; // Default placeholder
+
+      if (audioUri) finalAudioUrl = await uploadAudioMedia(audioUri);
+      if (image) {
+        const imgbbUrl = await uploadToImgBB(image);
+        if (imgbbUrl) finalImageUrl = imgbbUrl;
+      }
+
+      // --- ENHANCED DESCRIPTION ---
+      // Append the pricing details to the description so the worker sees exactly what the job entails
+      let enhancedDescription = `Duration: ${duration}. `;
+      if (pricingModel === "measurement")
+        enhancedDescription += `Scope: ${measurementInput} ${selectedSubCategoryData.pricing.unit}. `;
+      if (pricingModel === "task_based") {
+        const taskNames = selectedTaskItems.map((t) => t.item).join(", ");
+        enhancedDescription += `Tasks: ${taskNames}. `;
+      }
 
       const payload = {
         title: jobTitle,
-        description: `Duration: ${duration}. Category: ${category}. Contact: ${mobileNumber}`,
+        description: enhancedDescription,
+        audioUrl: finalAudioUrl,
         skillsRequired: category,
         earning: parseFloat(amount),
         location: address || "Pune, Maharashtra",
         latitude: finalLat,
         longitude: finalLng,
-        image: "https://example.com/images/default-work.jpg",
-        employerId: employerId,
+        image: finalImageUrl,
+        employerId: decoded.id,
       };
 
-      const API_URL = "http://10.62.29.175:8080/employer/post-work";
-
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/employer/post-work`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
         },
-        body: JSON.stringify(payload),
-      });
+      );
 
       if (response.ok) {
         Alert.alert("Success", "Work posted successfully!", [
-          {
-            text: "OK",
-            onPress: () => {
-              setJobTitle("");
-              setAmount("");
-              setDuration("");
-              setMobileNumber("");
-              setCategory("");
-              setAddress("");
-              setCoordinates(null);
-              router.replace("/(employer)/YouPostedScreen");
-            },
-          },
+          { text: "OK", onPress: () => router.replace("YouPostedScreen") },
         ]);
-      } else {
-        const errorData = await response.text();
-        Alert.alert("Failed", errorData || "Failed to post work.");
       }
     } catch (error) {
-      console.error("Post Error:", error);
-      Alert.alert("Network Error", "Check your server connection.");
+      console.error(error);
+      Alert.alert("Network Error", "Could not connect to the server.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSelectCategory = (selectedLabel) => {
-    setCategory(selectedLabel);
-    setModalVisible(false);
-  };
-
-  const renderCategoryModal = () => (
-    <Modal
-      animationType="slide"
-      transparent={true}
-      visible={modalVisible}
-      onRequestClose={() => setModalVisible(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Category</Text>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <MaterialIcons name="close" size={24} color="#000" />
-            </TouchableOpacity>
-          </View>
-
-          <FlatList
-            data={workCategories}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.categoryItem}
-                onPress={() => handleSelectCategory(item.label)}
-              >
-                <View
-                  style={[styles.colorDot, { backgroundColor: item.color }]}
-                />
-                <Text style={styles.categoryItemText}>{item.label}</Text>
-                {category === item.label && (
-                  <MaterialIcons name="check" size={20} color="#0D47A1" />
-                )}
-              </TouchableOpacity>
-            )}
+  // --- COMPONENT: RENDER PRICING SECTION ---
+  const renderPricingSection = () => {
+    // 1. MANUAL OR DEFAULT
+    if (pricingModel === "manual") {
+      return (
+        <View style={styles.amountContainer}>
+          <FontAwesome5
+            name="rupee-sign"
+            size={18}
+            color="#FFC107"
+            style={styles.rupeeIcon}
+          />
+          <TextInput
+            style={styles.amountInput}
+            placeholder="500"
+            keyboardType="numeric"
+            value={amount}
+            onChangeText={setAmount}
           />
         </View>
-      </View>
-    </Modal>
-  );
+      );
+    }
+
+    // 2. SHIFT BASED (Full Day / Half Day)
+    if (pricingModel === "shift") {
+      return (
+        <View style={styles.shiftContainer}>
+          <TouchableOpacity
+            style={[
+              styles.shiftBtn,
+              shiftType === "fullDay" && styles.shiftBtnActive,
+            ]}
+            onPress={() => handleShiftSelect("fullDay")}
+          >
+            <Text
+              style={[
+                styles.shiftText,
+                shiftType === "fullDay" && styles.shiftTextActive,
+              ]}
+            >
+              Full Day (8h){"\n"}₹
+              {selectedSubCategoryData.pricing.rates.fullDay}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.shiftBtn,
+              shiftType === "halfDay" && styles.shiftBtnActive,
+            ]}
+            onPress={() => handleShiftSelect("halfDay")}
+          >
+            <Text
+              style={[
+                styles.shiftText,
+                shiftType === "halfDay" && styles.shiftTextActive,
+              ]}
+            >
+              Half Day (4h){"\n"}₹
+              {selectedSubCategoryData.pricing.rates.halfDay}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    // 3. MEASUREMENT BASED (Sq Ft)
+    if (pricingModel === "measurement") {
+      return (
+        <View>
+          <View style={styles.amountContainer}>
+            <Text style={{ fontWeight: "bold", color: "#555" }}>
+              Area ({selectedSubCategoryData.pricing.unit}):{" "}
+            </Text>
+            <TextInput
+              style={styles.amountInput}
+              placeholder="e.g. 100"
+              keyboardType="numeric"
+              value={measurementInput}
+              onChangeText={handleMeasurementChange}
+            />
+          </View>
+          <Text style={styles.helperText}>
+            Standard Rate: ₹{selectedSubCategoryData.pricing.baseRate}/
+            {selectedSubCategoryData.pricing.unit}
+          </Text>
+          {amount !== "" && (
+            <Text style={styles.calculatedText}>Total Est: ₹{amount}</Text>
+          )}
+        </View>
+      );
+    }
+
+    // 4. TASK BASED (Menu)
+    if (pricingModel === "task_based") {
+      return (
+        <View>
+          <Text style={styles.sectionHeader}>
+            Select Tasks (Includes ₹
+            {selectedSubCategoryData.pricing.visitCharge} visit fee)
+          </Text>
+          {selectedSubCategoryData.pricing.rateCard.map((item, index) => {
+            const isSelected = selectedTaskItems.some(
+              (i) => i.item === item.item,
+            );
+            return (
+              <TouchableOpacity
+                key={index}
+                style={[styles.taskItem, isSelected && styles.taskItemActive]}
+                onPress={() => toggleTaskItem(item.item, item.price)}
+              >
+                <Text
+                  style={
+                    isSelected
+                      ? { color: "white", fontWeight: "bold" }
+                      : { color: "#333" }
+                  }
+                >
+                  {item.item}
+                </Text>
+                <Text
+                  style={
+                    isSelected
+                      ? { color: "white", fontWeight: "bold" }
+                      : { color: "#0D47A1", fontWeight: "bold" }
+                  }
+                >
+                  ₹{item.price}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+          <View style={styles.totalBox}>
+            <Text style={styles.totalText}>Total Budget: ₹{amount || 0}</Text>
+          </View>
+        </View>
+      );
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
-      {renderCategoryModal()}
+
+      <CategoryFilterModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        categories={workCategories}
+        onSelect={(label) => handleCategorySelection(label)}
+      />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* --- UPDATED HEADER --- */}
         <View style={styles.header}>
           <View>
             <Text style={styles.headerTitle}>Post New Work</Text>
             <Text style={styles.headerSubtitle}>Hire Skill in Seconds</Text>
           </View>
-
           <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
             <MaterialIcons name="logout" size={24} color="#fff" />
           </TouchableOpacity>
         </View>
-        {/* ---------------------- */}
 
         <View style={styles.formBody}>
-          {/* ... All Form Inputs (Title, Category, etc.) ... */}
+          {/* ... Job Title Input ... */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>JOB TITLE</Text>
             <View style={styles.inputWrapper}>
@@ -267,13 +539,14 @@ const PostNewWorkScreen = () => {
               />
               <TextInput
                 style={styles.input}
-                placeholder="e.g Need help with wall painting"
+                placeholder="e.g Help with moving"
                 value={jobTitle}
                 onChangeText={setJobTitle}
               />
             </View>
           </View>
 
+          {/* ... Category & Duration ... */}
           <View style={styles.rowContainer}>
             <View style={[styles.inputContainer, styles.halfWidth]}>
               <Text style={styles.label}>CATEGORY</Text>
@@ -289,21 +562,16 @@ const PostNewWorkScreen = () => {
                 />
                 <Text
                   style={[styles.dropdownText, !category && { color: "#999" }]}
-                  numberOfLines={1}
                 >
                   {category || "Select"}
                 </Text>
-                <MaterialIcons
-                  name="keyboard-arrow-down"
-                  size={20}
-                  color="#0D47A1"
-                />
               </TouchableOpacity>
             </View>
-
             <View style={[styles.inputContainer, styles.halfWidth]}>
               <Text style={styles.label}>DURATION</Text>
-              <View style={styles.inputWrapper}>
+              <View
+                style={[styles.inputWrapper, { backgroundColor: "#f0f0f0" }]}
+              >
                 <MaterialIcons
                   name="schedule"
                   size={20}
@@ -311,18 +579,77 @@ const PostNewWorkScreen = () => {
                   style={styles.inputIcon}
                 />
                 <TextInput
-                  style={styles.input}
-                  placeholder="e.g. 6 hrs"
+                  style={[styles.input, { color: "#555" }]}
+                  placeholder="Auto-calc"
                   value={duration}
-                  onChangeText={setDuration}
+                  editable={false} // Make Duration Auto-Calculated mostly
                 />
               </View>
             </View>
           </View>
 
+          {/* ... DYNAMIC PRICING SECTION ... */}
+          <View style={styles.pricingWrapper}>
+            <Text style={styles.label}>
+              {pricingModel === "manual"
+                ? "BUDGET"
+                : "CALCULATED BUDGET (Standard Rates applied)"}
+            </Text>
+
+            {renderPricingSection()}
+          </View>
+
+          {/* ... Media Buttons ... */}
+          <View style={[styles.mediaRow, { marginTop: 20 }]}>
+            {/* ... Keep your existing Media Buttons code exactly as is ... */}
+            <TouchableOpacity
+              style={[
+                styles.mediaButton,
+                isRecording && styles.recordingActive,
+                audioUri && styles.mediaSuccess,
+              ]}
+              onPress={isRecording ? stopRecording : startRecording}
+            >
+              <MaterialIcons
+                name={isRecording ? "stop" : "mic"}
+                size={24}
+                color={isRecording ? "#FFF" : "#0D47A1"}
+              />
+              <Text
+                style={[styles.mediaText, isRecording && { color: "white" }]}
+              >
+                {isRecording ? "Stop" : audioUri ? "Recorded" : "Add Voice"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.mediaButton, image && styles.mediaSuccess]}
+              onPress={pickImage}
+            >
+              <MaterialIcons name="camera-alt" size={24} color="#0D47A1" />
+              <Text style={styles.mediaText}>
+                {image ? "Image Added" : "Add Photo"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ... Image Preview Code ... */}
+          {image && (
+            <View style={styles.imagePreviewContainer}>
+              <Image source={{ uri: image }} style={styles.imagePreview} />
+              <TouchableOpacity
+                style={styles.removeImage}
+                onPress={() => setImage(null)}
+              >
+                <MaterialIcons name="close" size={16} color="white" />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* ... LOCATION SECTION (Keep exactly as before) ... */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>WORK LOCATION</Text>
             <View style={styles.locationToggle}>
+              {/* ... Keep your existing location toggle buttons ... */}
               <TouchableOpacity
                 style={[
                   styles.toggleButton,
@@ -336,7 +663,7 @@ const PostNewWorkScreen = () => {
                     locationMode === "current" && styles.toggleTextActive,
                   ]}
                 >
-                  Current Location
+                  Current
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -352,7 +679,7 @@ const PostNewWorkScreen = () => {
                     locationMode === "manual" && styles.toggleTextActive,
                   ]}
                 >
-                  Enter Address
+                  Manual
                 </Text>
               </TouchableOpacity>
             </View>
@@ -369,15 +696,10 @@ const PostNewWorkScreen = () => {
                   ) : (
                     <MaterialIcons name="my-location" size={20} color="#fff" />
                   )}
-                  <Text style={styles.detectButtonText}>
-                    {isLocating ? "Detecting..." : "Detect My Location"}
-                  </Text>
+                  <Text style={styles.detectButtonText}>Detect Location</Text>
                 </TouchableOpacity>
                 {address ? (
-                  <Text style={styles.detectedAddress}>
-                    <MaterialIcons name="place" size={16} color="green" />{" "}
-                    {address}
-                  </Text>
+                  <Text style={styles.detectedAddress}>{address}</Text>
                 ) : null}
               </View>
             ) : (
@@ -390,7 +712,7 @@ const PostNewWorkScreen = () => {
                 />
                 <TextInput
                   style={styles.input}
-                  placeholder="e.g. Flat 101, Main Road, Pune"
+                  placeholder="Enter full address"
                   value={address}
                   onChangeText={setAddress}
                   multiline
@@ -399,25 +721,7 @@ const PostNewWorkScreen = () => {
             )}
           </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>BUDGET AMOUNT</Text>
-            <View style={styles.amountContainer}>
-              <FontAwesome5
-                name="rupee-sign"
-                size={18}
-                color="#FFC107"
-                style={styles.rupeeIcon}
-              />
-              <TextInput
-                style={styles.amountInput}
-                placeholder="1000"
-                keyboardType="numeric"
-                value={amount}
-                onChangeText={setAmount}
-              />
-            </View>
-          </View>
-
+          {/* ... SUBMIT BUTTON ... */}
           <TouchableOpacity
             style={[styles.submitButton, loading && { opacity: 0.7 }]}
             onPress={handlePostWork}
@@ -433,7 +737,9 @@ const PostNewWorkScreen = () => {
                   color="#fff"
                   style={{ marginRight: 8 }}
                 />
-                <Text style={styles.submitButtonText}>Post Work</Text>
+                <Text style={styles.submitButtonText}>
+                  {amount ? `Post Job for ₹${amount}` : "Post Work"}
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -446,8 +752,6 @@ const PostNewWorkScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f8f9fa" },
   scrollContent: { paddingBottom: 80 },
-
-  // Updated Header Styles for Logout
   header: {
     backgroundColor: "#0D47A1",
     padding: 24,
@@ -455,95 +759,77 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     elevation: 6,
-    flexDirection: "row", // Align items horizontally
-    justifyContent: "space-between", // Space out title and logout
-    alignItems: "center", // Vertically center
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#fff",
-    letterSpacing: 0.5,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: "#E3F2FD",
-    marginTop: 8,
-    fontWeight: "500",
-  },
+  headerTitle: { fontSize: 28, fontWeight: "800", color: "#fff" },
+  headerSubtitle: { fontSize: 14, color: "#E3F2FD", marginTop: 5 },
   logoutButton: {
     padding: 8,
     backgroundColor: "rgba(255,255,255,0.15)",
     borderRadius: 50,
   },
-
   formBody: { padding: 20 },
   inputContainer: { marginBottom: 18 },
-  label: {
-    fontSize: 12,
-    color: "#0D47A1",
-    marginBottom: 8,
-    fontWeight: "700",
-    letterSpacing: 0.3,
-  },
+  label: { fontSize: 12, color: "#0D47A1", marginBottom: 8, fontWeight: "700" },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: "#E0E7FF",
     borderRadius: 12,
     backgroundColor: "#fff",
-    elevation: 2,
+    height: 50,
   },
   inputIcon: { marginLeft: 12 },
-  input: { flex: 1, padding: 14, fontSize: 16, color: "#000" },
+  input: { flex: 1, padding: 10, fontSize: 16, color: "#000" },
   rowContainer: { flexDirection: "row", justifyContent: "space-between" },
   halfWidth: { width: "48%" },
   dropdown: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: "#E0E7FF",
     borderRadius: 12,
-    padding: 14,
     backgroundColor: "#fff",
-    elevation: 2,
+    height: 50,
+    paddingHorizontal: 10,
   },
-  dropdownText: {
-    fontSize: 14,
-    color: "#000",
-    fontWeight: "500",
-    flex: 1,
-    marginLeft: 10,
-  },
-  amountContainer: {
+  dropdownText: { fontSize: 14, color: "#000", flex: 1, marginLeft: 10 },
+  mediaRow: {
     flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#E0E7FF",
-    borderRadius: 12,
-    padding: 14,
-    backgroundColor: "#fff",
-    elevation: 2,
+    justifyContent: "space-between",
+    marginBottom: 20,
   },
-  rupeeIcon: { marginRight: 10 },
-  amountInput: { flex: 1, fontSize: 18, fontWeight: "700", color: "#0D47A1" },
-  submitButton: {
-    backgroundColor: "#0D47A1",
-    padding: 16,
-    borderRadius: 12,
+  mediaButton: {
+    flex: 1,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row",
-    elevation: 5,
-    marginTop: 20,
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#0D47A1",
+    padding: 12,
+    borderRadius: 10,
+    marginHorizontal: 5,
   },
-  submitButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: 0.5,
+  recordingActive: { backgroundColor: "#FF3B30", borderColor: "#FF3B30" },
+  mediaSuccess: { backgroundColor: "#E8F5E9", borderColor: "#4CAF50" },
+  mediaText: { marginLeft: 8, color: "#0D47A1", fontWeight: "600" },
+  imagePreviewContainer: {
+    marginBottom: 20,
+    alignItems: "center",
+    position: "relative",
+  },
+  imagePreview: { width: "100%", height: 200, borderRadius: 12 },
+  removeImage: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    padding: 5,
+    borderRadius: 20,
   },
   locationToggle: {
     flexDirection: "row",
@@ -559,67 +845,128 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   toggleActive: { backgroundColor: "#fff", elevation: 2 },
-  toggleText: { color: "#666", fontWeight: "600", fontSize: 13 },
+  toggleText: { color: "#666", fontWeight: "600" },
   toggleTextActive: { color: "#0D47A1", fontWeight: "700" },
   locationBox: {
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: "#E0E7FF",
     borderRadius: 12,
     padding: 15,
     backgroundColor: "#fff",
-    alignItems: "flex-start",
   },
   detectButton: {
     flexDirection: "row",
     backgroundColor: "#FF9F43",
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detectButtonText: { color: "#fff", fontWeight: "bold", marginLeft: 8 },
+  detectedAddress: { marginTop: 10, fontSize: 14, color: "#333" },
+  amountContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E0E7FF",
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    height: 50,
+    paddingHorizontal: 10,
+  },
+  rupeeIcon: { marginRight: 10 },
+  amountInput: { flex: 1, fontSize: 18, fontWeight: "700", color: "#0D47A1" },
+  submitButton: {
+    backgroundColor: "#0D47A1",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+  },
+  submitButtonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+
+  // --- NEW STYLES FOR PRICING ---
+  pricingWrapper: {
+    backgroundColor: "#f1f8ff",
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#bbdefb",
+  },
+  shiftContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  shiftBtn: {
+    width: "48%",
+    padding: 15,
+    backgroundColor: "white",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    alignItems: "center",
+  },
+  shiftBtnActive: {
+    backgroundColor: "#e3f2fd",
+    borderColor: "#0D47A1",
+    borderWidth: 2,
+  },
+  shiftText: {
+    textAlign: "center",
+    color: "#555",
+    lineHeight: 20,
+  },
+  shiftTextActive: {
+    color: "#0D47A1",
+    fontWeight: "bold",
+  },
+  helperText: {
+    fontSize: 12,
+    color: "#777",
+    marginTop: 5,
+    fontStyle: "italic",
+  },
+  calculatedText: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#2e7d32",
+    textAlign: "right",
+  },
+  sectionHeader: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#777",
+    marginBottom: 10,
+  },
+  taskItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 12,
+    backgroundColor: "white",
+    marginBottom: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#eee",
+  },
+  taskItemActive: {
+    backgroundColor: "#0D47A1",
+    borderColor: "#0D47A1",
+  },
+  totalBox: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: "#fff3e0",
     borderRadius: 8,
     alignItems: "center",
   },
-  detectButtonText: {
-    color: "#fff",
+  totalText: {
     fontWeight: "bold",
-    marginLeft: 8,
-    fontSize: 14,
+    color: "#e65100",
+    fontSize: 16,
   },
-  detectedAddress: {
-    marginTop: 10,
-    fontSize: 14,
-    color: "#333",
-    lineHeight: 20,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: "60%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-    paddingBottom: 10,
-  },
-  modalTitle: { fontSize: 18, fontWeight: "bold", color: "#0D47A1" },
-  categoryItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  categoryItemText: { fontSize: 16, color: "#333", marginLeft: 15, flex: 1 },
-  colorDot: { width: 12, height: 12, borderRadius: 6 },
 });
 
 export default PostNewWorkScreen;

@@ -1,13 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
-import {
-  CheckCircle,
-  MapPin,
-  Phone,
-  ShieldCheck,
-  User,
-  X,
-} from "lucide-react-native";
+import { CheckCircle, MapPin, Phone, User, X } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -26,7 +19,70 @@ const EmployerWorkStatusScreen = () => {
   const params = useLocalSearchParams();
   const [workData, setWorkData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [labourLocation, setLabourLocation] = useState(null);
   const mapRef = useRef(null);
+
+  useEffect(() => {
+    let intervalId;
+
+    const fetchLiveLocation = async () => {
+      // Only fetch if we have a valid labour ID and work is active
+      if (!workData?.labour?.id || workData.status === "COMPLETED") return;
+
+      try {
+        const token = await AsyncStorage.getItem("userToken");
+        // Call the new GET endpoint
+        const response = await fetch(
+          `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/employer/${workData.labour.id}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log("Last latitude ", data);
+          if (data.lastLatitude && data.lastLongitude) {
+            setLabourLocation({
+              latitude: data.lastLatitude,
+              longitude: data.lastLongitude,
+            });
+          }
+        }
+      } catch (error) {
+        console.log("Live tracking error (silent):", error);
+      }
+    };
+
+    // 1. Initial Call
+    if (workData?.labour?.id) {
+      fetchLiveLocation();
+
+      // 2. Set Interval to poll every 10 seconds
+      intervalId = setInterval(fetchLiveLocation, 10000);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [workData?.labour?.id, workData?.status]);
+
+  useEffect(() => {
+    if (labourLocation && mapRef.current) {
+      mapRef.current.animateCamera(
+        {
+          center: {
+            latitude: labourLocation.latitude,
+            longitude: labourLocation.longitude,
+          },
+          zoom: 15,
+          pitch: 0,
+          heading: 0,
+        },
+        { duration: 1000 },
+      );
+    }
+  }, [labourLocation]);
 
   useEffect(() => {
     let isMounted = true;
@@ -58,7 +114,7 @@ const EmployerWorkStatusScreen = () => {
 
         // Priority 2: Fetch by ID
         if (params.workId) {
-          const API_URL = `http://10.62.29.175:8080/employer/work-status/${params.workId}?workId=${params.workId}`;
+          const API_URL = `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/employer/work-status/${params.workId}?workId=${params.workId}`;
           console.log("Fetching from:", API_URL);
 
           const response = await fetch(API_URL, {
@@ -71,6 +127,7 @@ const EmployerWorkStatusScreen = () => {
 
           if (response.ok) {
             const data = await response.json();
+            console.log("Data", data);
             if (isMounted) normalizeAndSetData(data);
           } else {
             const errorText = await response.text();
@@ -128,7 +185,7 @@ const EmployerWorkStatusScreen = () => {
               const token = await AsyncStorage.getItem("userToken");
 
               const response = await fetch(
-                `http://10.62.29.175:8080/employer/complete-work?workId=${workData.work.id}&employerId=${workData.work.employer.id}`,
+                `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/employer/complete-work?workId=${workData.work.id}&employerId=${workData.work.employer.id}`,
                 {
                   method: "PUT",
                   headers: {
@@ -178,6 +235,7 @@ const EmployerWorkStatusScreen = () => {
   const { work, labour, status } = workData;
   const hasLocation =
     work.latitude && work.longitude && !isNaN(parseFloat(work.latitude));
+  console.log("has location ", work.longitude);
   const isCompleted = status === "COMPLETED";
 
   return (
@@ -205,6 +263,7 @@ const EmployerWorkStatusScreen = () => {
         </View>
 
         {/* Map Section */}
+        {/* Map Section */}
         <View style={styles.mapCard}>
           <View style={styles.mapWrapper}>
             {hasLocation ? (
@@ -219,6 +278,7 @@ const EmployerWorkStatusScreen = () => {
                   longitudeDelta: 0.01,
                 }}
               >
+                {/* 1. Static Work Location (Existing) */}
                 <Marker
                   coordinate={{
                     latitude: parseFloat(work.latitude),
@@ -230,6 +290,29 @@ const EmployerWorkStatusScreen = () => {
                     <MapPin size={24} color="#1B1464" />
                   </View>
                 </Marker>
+
+                {/* 2. DYNAMIC LABOUR LOCATION (This was missing) */}
+                {labourLocation && (
+                  <>
+                    <Marker
+                      coordinate={labourLocation}
+                      title={labour.name || "Labour"}
+                    >
+                      {/* Green Marker for Labour */}
+                      <View
+                        style={{
+                          backgroundColor: "#2ecc71",
+                          padding: 6,
+                          borderRadius: 20,
+                          borderWidth: 2,
+                          borderColor: "#FFF",
+                        }}
+                      >
+                        <User size={20} color="#FFF" />
+                      </View>
+                    </Marker>
+                  </>
+                )}
               </MapView>
             ) : (
               <View style={styles.mapPlaceholder}>
@@ -309,8 +392,10 @@ const EmployerWorkStatusScreen = () => {
             // --- VIEW WHEN ACTIVE ---
             <>
               <View style={styles.secureBadge}>
-                <ShieldCheck size={16} color="#555" />
-                <Text style={styles.secureText}>Payment Secure</Text>
+                <Text style={styles.secureText}>
+                  Click the Mark Completed button only when the work is
+                  successfully completed
+                </Text>
               </View>
 
               <TouchableOpacity

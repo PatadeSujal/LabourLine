@@ -1,286 +1,404 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router, useLocalSearchParams } from "expo-router";
+import * as Location from "expo-location";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { jwtDecode } from "jwt-decode";
-import { useState } from "react"; // Removed useEffect
+import { CheckCircle, MapPin, Navigation, Phone } from "lucide-react-native";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  ImageBackground,
+  BackHandler,
+  Linking,
+  SafeAreaView,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import Icon from "react-native-vector-icons/MaterialIcons";
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
+import { calculateDistance } from "../store/locationUtils";
 
-const SelectWorkScreen = () => {
+const WorkStatusScreen = () => {
   const params = useLocalSearchParams();
+  const [workData, setWorkData] = useState(null);
+  const [myLocation, setMyLocation] = useState(null);
+  const [distance, setDistance] = useState(null);
+  const [hasReached, setHasReached] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false); // Source of Truth for Real-time
 
-  // --- FIX START: Initialize State Directly (Lazy Initialization) ---
-  // This replaces the useEffect completely and prevents the "Maximum update depth" error.
+  const mapRef = useRef(null);
+  const lastSentLocation = useRef({ latitude: 0, longitude: 0 });
+  const locationSubscription = useRef(null);
 
-  const [categoryTitle] = useState(params.categoryName || "Select Work");
-
-  // We use a function () => ... inside useState to parse the JSON only once
-  const [subRoles] = useState(() => {
-    if (params.subCategories) {
+  // 1. Parse Initial Data and check initial status
+  useEffect(() => {
+    if (params.workData) {
       try {
-        return JSON.parse(params.subCategories);
+        const parsed = JSON.parse(params.workData);
+        setWorkData(parsed);
+        // Check if it arrived already completed
+        const initialStatus = parsed.status || parsed.work?.status;
+        if (initialStatus === "COMPLETED") {
+          setIsCompleted(true);
+        }
       } catch (e) {
-        console.error("Error parsing data:", e);
-        return [];
+        console.error("Error parsing work data", e);
       }
     }
-    return [];
-  });
-  // --- FIX END ---
+  }, [params.workData]);
 
-  const [selectedJobs, setSelectedJobs] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  // 2. REAL-TIME POLLING: Check for Completion
+  useEffect(() => {
+    let statusInterval;
 
-  const tagColors = [
-    "#D980FA",
-    "#FF4757",
-    "#FF9F43",
-    "#FBC531",
-    "#54A0FF",
-    "#006266",
-    "#FF4757",
-    "#00CEC9",
-  ];
+    const checkJobStatus = async () => {
+      if (isCompleted || !workData?.work?.id) return;
 
-  const toggleSelection = (id) => {
-    if (selectedJobs.includes(id)) {
-      setSelectedJobs(selectedJobs.filter((jobId) => jobId !== id));
-    } else {
-      setSelectedJobs([...selectedJobs, id]);
-    }
-  };
+      try {
+        const token = await AsyncStorage.getItem("userToken");
+        const workId = workData.work.id;
 
-  const handleNextPress = async () => {
-    if (selectedJobs.length === 0) return;
+        // Ensure the URL matches your @RequestParam("workId")
+        const API_URL = `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/employer/work-status/${workId}?workId=${workId}`;
 
-    setIsLoading(true);
-
-    try {
-      const token = await AsyncStorage.getItem("userToken");
-      if (!token) {
-        Alert.alert("Error", "User not authenticated. Please login again.");
-        setIsLoading(false);
-        return;
-      }
-
-      // NOTE: Ensure your token has 'id' or 'userId'. Check your backend login response if this fails.
-      const decoded = jwtDecode(token);
-      const labourId = decoded.id || decoded.userId;
-
-      if (!labourId) {
-        Alert.alert("Error", "Invalid Token: ID not found.");
-        setIsLoading(false);
-        return;
-      }
-
-      // Create the space-separated string
-      const skillsString = subRoles
-        .filter((role) => selectedJobs.includes(role.id))
-        .map((role) => role.label)
-        .join(" ");
-
-      console.log("Sending Skills:", skillsString);
-
-      // Replace with your IP
-      const response = await fetch(
-        `http://10.62.29.175:8080/labour/${labourId}/skills`,
-        {
-          method: "PUT",
+        const response = await fetch(API_URL, {
+          method: "GET",
           headers: {
-            "Content-Type": "text/plain",
             Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache", // Prevent stale results
           },
-          body: skillsString,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+
+          // LOG THE DATA to see exactly what the backend is sending
+          console.log(
+            "Polling Result for ID " + workId + ":",
+            JSON.stringify(data),
+          );
+
+          // Check all common paths for the status string
+          const currentStatus =
+            data.status || // If it's in the root (like your Map.of return)
+            data.work?.status || // If it's inside the work object
+            data.acceptedWork?.status; // If it's nested elsewhere
+
+          if (currentStatus === "COMPLETED") {
+            console.log("MATCH FOUND: Switching to Completed state");
+            setIsCompleted(true);
+            Alert.alert("Success", "Work Completed!", [
+              {
+                text: "OK",
+                onPress: () => router.replace("/(tabs)/WorkScreen"),
+              },
+            ]);
+          }
+        }
+      } catch (error) {
+        console.error("Polling Network Error:", error);
+      }
+    };
+
+    // Poll every 5 seconds for a "Real-time" feel
+    statusInterval = setInterval(checkJobStatus, 5000);
+
+    return () => clearInterval(statusInterval);
+  }, [workData?.work?.id, isCompleted]);
+
+  // 3. Live Location Tracking (Stop tracking if completed)
+  useEffect(() => {
+    let isMounted = true;
+
+    const startLiveTracking = async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
+
+      locationSubscription.current = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 5000,
+          distanceInterval: 10,
+        },
+        async (location) => {
+          if (!isMounted || isCompleted) return;
+
+          const { latitude, longitude } = location.coords;
+          setMyLocation({ latitude, longitude });
+
+          // Sync with backend if moved > 20 meters
+          const distMoved = calculateDistance(
+            latitude,
+            longitude,
+            lastSentLocation.current.latitude,
+            lastSentLocation.current.longitude,
+          );
+
+          if (parseFloat(distMoved) > 0.02) {
+            syncLocationWithBackend(latitude, longitude);
+            lastSentLocation.current = { latitude, longitude };
+          }
         },
       );
+    };
 
-      if (response.ok) {
-        router.replace("/(worker)/WorkScreen");
-      } else {
-        const errorText = await response.text();
-        Alert.alert("Update Failed", errorText || "Could not update skills");
-      }
-    } catch (error) {
-      console.error("Network request failed:", error);
-      Alert.alert("Error", "Network request failed. Check your connection.");
-    } finally {
-      setIsLoading(false);
+    if (!isCompleted) startLiveTracking();
+
+    return () => {
+      isMounted = false;
+      if (locationSubscription.current) locationSubscription.current.remove();
+    };
+  }, [isCompleted]);
+
+  const syncLocationWithBackend = async (lat, lng) => {
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      const decode = jwtDecode(token);
+      await fetch(
+        `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/labour/update-location`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            labourId: decode.id,
+            latitude: lat,
+            longitude: lng,
+          }),
+        },
+      );
+    } catch (e) {
+      console.log("Sync Error", e);
     }
   };
 
+  // 4. Calculate Distance to Job
+  useEffect(() => {
+    if (myLocation && workData?.work) {
+      const d = calculateDistance(
+        myLocation.latitude,
+        myLocation.longitude,
+        workData.work.latitude,
+        workData.work.longitude,
+      );
+      setDistance(d);
+      setHasReached(parseFloat(d) < 0.2); // Within 200 meters
+    }
+  }, [myLocation, workData]);
+
+  // 5. Navigation Guard
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (isCompleted) return false; // Allow back if done
+        Alert.alert(
+          "Active Job",
+          "Location tracking is active. You cannot leave yet.",
+        );
+        return true;
+      };
+      BackHandler.addEventListener("hardwareBackPress", onBackPress);
+      return () =>
+        BackHandler.removeEventListener("hardwareBackPress", onBackPress);
+    }, [isCompleted]),
+  );
+
+  if (!workData)
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#2D68FF" />
+      </View>
+    );
+
+  const { work } = workData;
+
   return (
-    <View style={styles.container}>
-      <StatusBar
-        translucent
-        backgroundColor="transparent"
-        barStyle="dark-content"
-      />
-
-      <ImageBackground
-        source={require("../images/shram-bg.png")}
-        style={styles.background}
-        resizeMode="cover"
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.headerText}>{categoryTitle}</Text>
-
-          <View style={styles.tagsContainer}>
-            {subRoles.length > 0 ? (
-              subRoles.map((role, index) => {
-                const isSelected = selectedJobs.includes(role.id);
-                const buttonColor = tagColors[index % tagColors.length];
-
-                return (
-                  <TouchableOpacity
-                    key={role.id}
-                    style={[
-                      styles.jobButton,
-                      { backgroundColor: buttonColor },
-                      isSelected && styles.selectedButton,
-                    ]}
-                    onPress={() => toggleSelection(role.id)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.buttonText}>{role.label}</Text>
-                    {isSelected && (
-                      <View style={styles.iconContainer}>
-                        <Icon name="check" size={18} color="#fff" />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })
-            ) : (
-              <Text style={{ color: "#666", fontSize: 16 }}>
-                No sub-categories found.
-              </Text>
-            )}
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Header Status - Dynamic based on state */}
+        <View style={styles.header}>
+          <View style={[styles.badge, isCompleted && styles.completedBadge]}>
+            <Text
+              style={[
+                styles.badgeText,
+                isCompleted && styles.completedBadgeText,
+              ]}
+            >
+              {isCompleted ? "COMPLETED" : "IN PROGRESS"}
+            </Text>
           </View>
-        </ScrollView>
-
-        <View style={styles.footerContainer}>
-          <TouchableOpacity
-            style={[
-              styles.nextButton,
-              {
-                backgroundColor:
-                  selectedJobs.length > 0 ? "#FF4757" : "#bdc3c7",
-              },
-            ]}
-            onPress={handleNextPress}
-            disabled={selectedJobs.length === 0 || isLoading}
-            activeOpacity={0.8}
-          >
-            {isLoading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Text style={styles.nextButtonText}>Next</Text>
-                <Icon name="arrow-forward" size={24} color="#fff" />
-              </>
-            )}
-          </TouchableOpacity>
         </View>
-      </ImageBackground>
-    </View>
+
+        {/* Map View */}
+        <View style={styles.mapCard}>
+          <View style={styles.mapHeader}>
+            <Text style={styles.mapTitle}>Route to Destination</Text>
+            <Text style={styles.distanceText}>
+              {distance ? `${distance} km` : "Locating..."}
+            </Text>
+          </View>
+          <View style={styles.mapWrapper}>
+            <MapView
+              ref={mapRef}
+              style={styles.map}
+              provider={PROVIDER_GOOGLE}
+              initialRegion={{
+                latitude: work.latitude,
+                longitude: work.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+              }}
+              showsUserLocation={true}
+            >
+              <Marker
+                coordinate={{
+                  latitude: work.latitude,
+                  longitude: work.longitude,
+                }}
+              >
+                <View style={styles.markerContainer}>
+                  <MapPin size={24} color="#FF4D4D" />
+                </View>
+              </Marker>
+              {myLocation && (
+                <Polyline
+                  coordinates={[
+                    myLocation,
+                    { latitude: work.latitude, longitude: work.longitude },
+                  ]}
+                  strokeColor="#2D68FF"
+                  strokeWidth={4}
+                  lineDashPattern={[5, 5]}
+                />
+              )}
+            </MapView>
+            <TouchableOpacity
+              style={styles.navigateButton}
+              onPress={() =>
+                Linking.openURL(
+                  `geo:${work.latitude},${work.longitude}?q=${work.latitude},${work.longitude}`,
+                )
+              }
+            >
+              <Navigation size={18} color="#FFF" />
+              <Text style={styles.navigateText}>Navigate</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Status Card */}
+        {hasReached && !isCompleted && (
+          <View style={styles.reachedCard}>
+            <CheckCircle size={24} color="#4CAF50" />
+            <Text style={styles.reachedTitle}>You have arrived!</Text>
+          </View>
+        )}
+
+        {/* Info Card */}
+        <View style={styles.card}>
+          <Text style={styles.jobTitle}>{work.title}</Text>
+          <Text style={styles.employerName}>
+            Employer: {work.employer?.name}
+          </Text>
+          <View style={styles.divider} />
+          <Text style={styles.earningsValue}>Earnings: ₹{work.earning}</Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.contactButton}
+          onPress={() => Linking.openURL(`tel:${work.employer?.phoneNo}`)}
+        >
+          <Phone size={20} color="#2196F3" />
+          <Text style={styles.contactButtonText}>Call Employer</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  background: { flex: 1, width: "100%", height: "100%" },
-  scrollContainer: {
-    flexGrow: 1,
-    paddingHorizontal: 15,
-    paddingTop: 80,
-    paddingBottom: 100,
-    alignItems: "center",
-  },
-  headerText: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#000",
-    marginBottom: 30,
-    textAlign: "center",
-    paddingHorizontal: 10,
-  },
-  tagsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    width: "100%",
-  },
-  jobButton: {
-    paddingVertical: 12,
+  container: { flex: 1, backgroundColor: "#F8F9FA" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  scrollContent: { padding: 20 },
+  header: { alignItems: "center", marginBottom: 15 },
+  badge: {
+    backgroundColor: "#E3F2FD",
+    paddingVertical: 6,
     paddingHorizontal: 20,
-    borderRadius: 30,
-    margin: 6,
+    borderRadius: 20,
+  },
+  completedBadge: { backgroundColor: "#E8F5E9" },
+  badgeText: { color: "#2196F3", fontWeight: "bold", fontSize: 14 },
+  completedBadgeText: { color: "#4CAF50" },
+  mapCard: {
+    backgroundColor: "#FFF",
+    borderRadius: 20,
+    overflow: "hidden",
+    elevation: 4,
+    marginBottom: 15,
+  },
+  mapHeader: {
+    padding: 15,
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    justifyContent: "space-between",
   },
-  selectedButton: {
-    borderWidth: 3,
-    borderColor: "#fff",
-    paddingVertical: 9,
-    paddingHorizontal: 17,
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  iconContainer: {
-    marginLeft: 8,
-    backgroundColor: "rgba(255,255,255,0.3)",
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  footerContainer: {
+  mapTitle: { fontWeight: "bold", color: "#333" },
+  distanceText: { color: "#2D68FF", fontWeight: "bold" },
+  mapWrapper: { height: 250 },
+  map: { flex: 1 },
+  navigateButton: {
     position: "absolute",
-    bottom: 0,
-    width: "100%",
-    padding: 20,
-  },
-  nextButton: {
+    bottom: 15,
+    right: 15,
+    backgroundColor: "#2D68FF",
     flexDirection: "row",
+    padding: 12,
+    borderRadius: 25,
+    elevation: 5,
+  },
+  navigateText: { color: "#FFF", marginLeft: 8, fontWeight: "bold" },
+  markerContainer: {
+    backgroundColor: "#FFF",
+    padding: 6,
+    borderRadius: 20,
+    elevation: 3,
+  },
+  reachedCard: {
+    backgroundColor: "#E8F5E9",
+    padding: 15,
+    borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+  },
+  reachedTitle: { marginLeft: 10, color: "#2E7D32", fontWeight: "bold" },
+  card: {
+    backgroundColor: "#FFF",
+    padding: 20,
+    borderRadius: 20,
+    elevation: 3,
+    marginBottom: 15,
+  },
+  jobTitle: { fontSize: 20, fontWeight: "bold", color: "#333" },
+  employerName: { color: "#777", marginTop: 5, fontSize: 14 },
+  divider: { height: 1, backgroundColor: "#EEE", marginVertical: 15 },
+  earningsValue: { fontSize: 20, fontWeight: "bold", color: "#2D68FF" },
+  contactButton: {
+    flexDirection: "row",
+    backgroundColor: "#FFF",
+    padding: 15,
+    borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
-    paddingVertical: 15,
-    borderRadius: 15,
-    elevation: 5,
-    shadowColor: "#FF4757",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
+    borderWidth: 1,
+    borderColor: "#E9ECEF",
   },
-  nextButtonText: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "bold",
-    marginRight: 10,
-  },
+  contactButtonText: { marginLeft: 10, fontWeight: "bold", color: "#333" },
 });
 
-export default SelectWorkScreen;
+export default WorkStatusScreen;

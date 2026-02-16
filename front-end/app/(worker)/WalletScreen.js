@@ -45,7 +45,7 @@ const WalletScreen = () => {
       const userId = decoded.id;
 
       // Ensure this matches your Spring Boot machine's IP
-      const API_URL = `http://10.62.29.175:8080/user/${userId}/labour-profile`;
+      const API_URL = `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/user/${userId}/labour-profile`;
 
       const response = await fetch(API_URL, {
         method: "GET",

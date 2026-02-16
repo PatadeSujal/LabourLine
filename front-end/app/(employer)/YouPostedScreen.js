@@ -31,7 +31,7 @@ const YouPostedScreen = () => {
       const userId = decoded.id;
 
       // Update IP to match your current server address
-      const API_URL = `http://10.62.29.175:8080/employer/${userId}/my-open-work`;
+      const API_URL = `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/employer/${userId}/my-open-work`;
 
       const response = await fetch(API_URL, {
         method: "GET",
@@ -43,7 +43,7 @@ const YouPostedScreen = () => {
 
       if (response.ok) {
         const data = await response.json();
-
+        // console.log(data);
         // Mapping API data to match your JobCard's expected prop structure
         const mappedJobs = data.map((job) => ({
           id: job.id,

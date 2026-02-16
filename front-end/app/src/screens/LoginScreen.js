@@ -3,13 +3,13 @@ import { useRouter } from "expo-router"; // Import useRouter hook
 import { jwtDecode } from "jwt-decode";
 import { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const LoginScreen = () => {
@@ -18,6 +18,7 @@ const LoginScreen = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  console.log(`${process.env.EXPO_PUBLIC_FRONTEND_API_URL}`);
   const handleLogin = async () => {
     if (!phoneNo || !password) {
       Alert.alert("Input Error", "Please enter phone number and password");
@@ -26,7 +27,8 @@ const LoginScreen = () => {
 
     setLoading(true);
     // Ensure this IP is exactly what your laptop shows in ipconfig/ifconfig
-    const API_URL = "http://10.62.29.175:8080/auth/login";
+    const API_URL = `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/auth/login`;
+    console.log(`${process.env.EXPO_PUBLIC_FRONTEND_API_URL}`);
 
     try {
       const response = await fetch(API_URL, {

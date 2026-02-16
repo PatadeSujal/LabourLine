@@ -1,4 +1,6 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import { jwtDecode } from "jwt-decode";
 import {
   Dimensions,
   ImageBackground,
@@ -9,13 +11,10 @@ import {
   View,
 } from "react-native";
 const { width } = Dimensions.get("window");
-const handleLanguageSelect = (lang) => {
-  console.log("Selected:", lang.label);
-  // Navigate to the Create Account screen
-  router.push("/create-account");
-};
+
+
+
 const LanguageSelectionScreen = () => {
-  // Data array for languages with specific colors matching the design
   const languages = [
     { id: "1", label: "हिंदी", color: "#FF5E57" }, // Red/Coral
     { id: "2", label: "मराठी", color: "#FF9F43" }, // Orange

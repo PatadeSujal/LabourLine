@@ -18,7 +18,7 @@ const ChooseRoleScreen = ({ userDetails }) => {
   const params = useLocalSearchParams();
   const registerUser = async (selectedRole) => {
     setLoading(true);
-    const API_URL = "http://10.62.29.175:8080/auth/register";
+    const API_URL = `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/auth/register`;
 
     const payload = {
       phoneNo: params.phoneNo,

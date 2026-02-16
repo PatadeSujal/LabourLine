@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import { jwtDecode } from "jwt-decode";
+
 import { useEffect, useState } from "react"; // Added useEffect
 import {
   ActivityIndicator,
@@ -17,59 +17,112 @@ import {
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 import JobCard from "../../components/JobCard";
+import CategoryFilterModal from "../../components/RenderModal";
+import { filterData } from "../src/store/WorkData";
+import {
+  getCurrentAddress,
+  getUserCoordinates,
+} from "../src/store/locationUtils";
+import { acceptWorkApi } from "../src/store/workService";
 
 const WorkScreen = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [jobs, setJobs] = useState([]); // State for API data
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeFilters, setActiveFilters] = useState({
+    category: "",
+    maxDistance: null,
+    minEarning: null,
+  });
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalTitle, setModalTitle] = useState("Filters");
+  const [currentOptions, setCurrentOptions] = useState(filterData.price);
+  const [liveLocation, setLiveLocation] = useState("Fetching location...");
+  const handleFilterSelection = async (label) => {
+    const distanceMatch = label.match(/\d+/);
+    if (!distanceMatch) return;
 
-  const fetchJobs = async () => {
-    // 1. Retrieve Token from Storage
-    const token = await AsyncStorage.getItem("userToken");
+    const distanceValue = parseInt(distanceMatch[0]);
 
-    if (!token) {
-      console.log("No token found, redirecting to login...");
-      setLoading(false);
-      router.replace("/LoginScreen"); // Redirect if not logged in
-      return;
-    }
-
-    const API_URL = "http://10.62.29.175:8080/labour/open-work";
+    setModalVisible(false);
+    setLoading(true);
 
     try {
-      const response = await fetch(API_URL, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`, // Use the dynamic token here
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      });
+      const coords = await getUserCoordinates();
 
-      if (!response.ok) {
-        // Optional: Handle 401 Unauthorized specifically
-        if (response.status === 401) {
-          Alert.alert("Session Expired", "Please login again.");
-          await AsyncStorage.removeItem("userToken");
-          router.replace("/LoginScreen");
-          return;
-        }
-        throw new Error(`Server responded with ${response.status}`);
+      if (coords) {
+        const newFilters = {
+          ...activeFilters,
+          maxDistance: distanceValue,
+          userLat: coords.latitude,
+          userLng: coords.longitude,
+        };
+
+        setActiveFilters(newFilters);
+        fetchJobs(newFilters);
+      } else {
+        Alert.alert("Location Error", "Could not get your location.");
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error(error);
+      setLoading(false);
+    }
+  };
+
+  const applyFinalFilter = (value) => {
+    console.log("Applying filter:", value);
+    // Logic to update your API payload here
+    setModalVisible(false);
+  };
+
+  const resetToMainMenu = () => {
+    setModalTitle("Filters");
+    setCurrentOptions(filterData.main);
+  };
+  const fetchJobs = async (filtersToApply = {}) => {
+    setLoading(true);
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      let url = `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/labour/open-work?`;
+
+      if (filtersToApply.maxDistance) {
+        url += `maxDistance=${filtersToApply.maxDistance}&`;
+        url += `userLat=${filtersToApply.userLat}&`;
+        url += `userLng=${filtersToApply.userLng}&`;
       }
 
-      const data = await response.json();
-      console.log(data);
-      setJobs(data);
+      console.log("Fetching with distance filter:", url);
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setJobs(data);
+      }
     } catch (error) {
-      console.error("Error fetching jobs:", error);
-      Alert.alert("Error", "Failed to load jobs. Check your connection.");
+      console.error(error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
   useEffect(() => {
+    // Use the generalized function
+    const initializeLocation = async () => {
+      const address = await getCurrentAddress();
+      if (address) {
+        setLiveLocation(address);
+      } else {
+        setLiveLocation("Location Not Found"); // Default fallback
+      }
+    };
+
+    initializeLocation();
     fetchJobs();
   }, []);
 
@@ -80,48 +133,21 @@ const WorkScreen = () => {
 
   const handleAcceptWork = async (workId) => {
     setLoading(true);
-
     try {
-      // 1. Get Token from Storage
-      const token = await AsyncStorage.getItem("userToken");
-      if (!token) {
-        Alert.alert("Error", "You must be logged in to accept work.");
-        setLoading(false);
-        return;
-      }
+      // Call the generalized API function
+      const acceptedWorkData = await acceptWorkApi(workId);
 
-      const decoded = jwtDecode(token);
-      const labourId = decoded.id;
+      Alert.alert("Success", "Work Accepted!");
 
-      console.log(`Accepting Work: WorkID=${workId}, LabourID=${labourId}`);
-
-      const API_URL = `http://10.62.29.175:8080/labour/accept-work?labourId=${labourId}&workId=${workId}`;
-
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      // Navigate using the returned data
+      router.push({
+        pathname: "/src/screens/WorkStatusScreen",
+        params: {
+          workData: JSON.stringify(acceptedWorkData),
         },
       });
-
-      if (response.ok) {
-        Alert.alert("Success", "Work Accepted!");
-        console.log(response);
-        const acceptedWorkData = await response.json();
-        router.push({
-          pathname: "/src/screens/WorkStatusScreen",
-          params: {
-            workData: JSON.stringify(acceptedWorkData), // <--- CRITICAL LINE
-          },
-        });
-      } else {
-        const errorText = await response.text();
-        Alert.alert("Failed", errorText || "Could not accept work.");
-      }
     } catch (error) {
-      console.error("Accept Work Error:", error);
-      Alert.alert("Network Error", "Check your connection.");
+      Alert.alert("Failed", error.message);
     } finally {
       setLoading(false);
     }
@@ -136,7 +162,19 @@ const WorkScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar backgroundColor="#FF9F43" barStyle="dark-content" />
+      <StatusBar
+        translucent
+        backgroundColor="#FF9F43"
+        barStyle="dark-content"
+      />
+
+      <CategoryFilterModal
+        visible={modalVisible}
+        categories={currentOptions}
+        onSelect={handleFilterSelection}
+        onClose={() => setModalVisible(false)}
+        title="Select Distance"
+      />
 
       <View style={styles.headerContainer}>
         <View style={styles.headerTopRow}>
@@ -144,7 +182,7 @@ const WorkScreen = () => {
             <Text style={styles.headerTitle}>Select Work</Text>
             <View style={styles.locationPill}>
               <Icon name="location-outline" size={16} color="#000" />
-              <Text style={styles.locationText}>Dhankawadi, Pune</Text>
+              <Text style={styles.locationText}>{liveLocation}</Text>
             </View>
           </View>
           <TouchableOpacity style={styles.notificationButton}>
@@ -167,7 +205,12 @@ const WorkScreen = () => {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-          <TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              setCurrentOptions(filterData.distance);
+              setModalVisible(true);
+            }}
+          >
             <Icon name="filter-outline" size={20} color="#555" />
           </TouchableOpacity>
         </View>
@@ -193,7 +236,7 @@ const WorkScreen = () => {
               <JobCard
                 key={job.id}
                 job={job}
-                onAccept={handleAcceptWork}
+                // onAccept={handleAcceptWork}
                 mainText={"Accept"}
               />
             ))
