@@ -33,7 +33,6 @@ public class JwtFilter extends OncePerRequestFilter {
 @Override
 protected boolean shouldNotFilter(HttpServletRequest request) {
     boolean skip = request.getServletPath().startsWith("/auth/");
-    System.out.println("JWT FILTER → skip=" + skip + ", path=" + request.getServletPath());
     return skip;
 }
 

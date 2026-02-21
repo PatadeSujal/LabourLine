@@ -1,6 +1,8 @@
 package com.LabourLine.LabourLine.dto;
 
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
@@ -11,12 +13,14 @@ import lombok.Setter;
 public class WorkDto {
     private String title;
     private String description;
-    private String skillsRequired;
-    private Double earning;
+    private String skillsRequired; // Category
+    private Double budget;         // The Amount
+    @JsonProperty("isBiddingAllowed")
+    private boolean isBiddingAllowed; // <--- CRITICAL FIELD
     private String location;
+    private Double latitude;
+    private Double longitude;
     private String image;
-     private Double latitude;  // e.g., 18.5204
-    private Double longitude; // e.g., 73.8567
     private String audioUrl;
-    private Long employerId; 
+    private Long employerId;
 }

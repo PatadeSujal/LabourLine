@@ -37,9 +37,7 @@ public ResponseEntity<AuthResponse> register(@RequestBody RegisterRequest req) {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequestDto req) {
-        System.out.println("dfdfdf");
-        System.out.println(req.password);
-        System.out.println(req.phoneNo);
+  
         String token = authService.login(req);
         return ResponseEntity.ok(token);
     }

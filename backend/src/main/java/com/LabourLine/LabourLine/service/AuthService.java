@@ -71,7 +71,6 @@ public AuthResponse register(RegisterRequest req) { // Change return type
 }
 
     public String login(LoginRequestDto req) {
-        System.out.println(req.phoneNo);
     User user = userRepo.findByPhoneNo(req.phoneNo)
             .orElseThrow(() -> new RuntimeException("User not found"));
 

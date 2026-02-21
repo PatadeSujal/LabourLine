@@ -15,13 +15,11 @@ public class WorkAccepted {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Relationship to the Work being done
     @ManyToOne
     @JoinColumn(name = "work_id", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Work work;
 
-    // Relationship to the Labour who accepted it
     @ManyToOne
     @JoinColumn(name = "labour_id", nullable = false)
     private User labour;
