@@ -1,5 +1,4 @@
 import { Audio } from "expo-av";
-import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Alert,
@@ -14,47 +13,29 @@ import {
   calculateDistance,
   getUserCoordinates,
 } from "../app/src/store/locationUtils";
-import { acceptWorkApi } from "../app/src/store/workService";
 
-// Added new prop 'onPressAction' for the "other function" logic
 const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
   const [distanceText, setDistanceText] = useState("Locating...");
   const [sound, setSound] = useState(null);
-  const [loading, setLoading] = useState(true);
-  // --- 1. NEW BUTTON HANDLER LOGIC ---
+
+  // Helper to check if this is a bidding job
+  const isBidding = job.isBiddingAllowed;
+
   const handleButtonPress = () => {
-    if (mainText === "View Status") {
-      // Case 1: If text is "Status", run onAccept (as requested)
-      if (onAccept) onAccept(job.id);
-    } else {
-      // Case 2: Else run "other function" (passed via onPressAction prop)
-      // if (onPressAction) {
-      handleAcceptWork(job.id);
-      // }
+    // 1. If Bidding is allowed, trigger the Bidding Action (Modal)
+    if (isBidding) {
+      if (onPressAction) {
+        onPressAction(job);
+      }
+      return;
+    }
+
+    // 2. Otherwise, trigger the standard Accept Action
+    if (onAccept) {
+      onAccept(job.id);
     }
   };
-  const handleAcceptWork = async (workId) => {
-    setLoading(true);
-    try {
-      // Call the generalized API function
-      const acceptedWorkData = await acceptWorkApi(workId);
 
-      Alert.alert("Success", "Work Accepted!");
-
-      // Navigate using the returned data
-      router.push({
-        pathname: "/src/screens/WorkStatusScreen",
-        params: {
-          workData: JSON.stringify(acceptedWorkData),
-        },
-      });
-    } catch (error) {
-      Alert.alert("Failed", error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-  // ... (Rest of your existing logic remains the same)
   useEffect(() => {
     let isMounted = true;
     const getDistance = async () => {
@@ -165,22 +146,26 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
 
           <View style={styles.footerRow}>
             <View>
-              <Text style={styles.earningLabel}>Earning</Text>
+              <Text style={styles.earningLabel}>
+                {isBidding ? "Budget" : "Earning"}
+              </Text>
               <Text style={styles.earningValue}>
-                ₹ {job.earning || job.salary}
+                ₹ {job.budget || job.salary}
               </Text>
             </View>
 
             <TouchableOpacity
               style={[
-                styles.acceptButton,
-                mainText === "Status" && styles.statusButton,
+                styles.acceptButton, // Default Blue
+                mainText === "Status" && styles.statusButton, // Orange override
+                isBidding && styles.bidButton, // Purple override for Bidding
               ]}
-              // UPDATED: Using the new handler logic
               onPress={handleButtonPress}
               activeOpacity={0.8}
             >
-              <Text style={styles.acceptText}>{mainText || "Accept"}</Text>
+              <Text style={styles.acceptText}>
+                {mainText || (isBidding ? "Bid Now" : "Accept")}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -190,6 +175,7 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
 };
 
 const styles = StyleSheet.create({
+  // ... (Your existing styles remain the same) ...
   card: {
     backgroundColor: "#fff",
     borderRadius: 16,
@@ -258,14 +244,19 @@ const styles = StyleSheet.create({
   },
   earningLabel: { fontSize: 10, color: "#888" },
   earningValue: { fontSize: 18, fontWeight: "bold", color: "#2ecc71" },
+
+  // --- BUTTON STYLES ---
   acceptButton: {
-    backgroundColor: "#1B1464",
+    backgroundColor: "#1B1464", // Default Navy Blue (For Accept)
     paddingVertical: 8,
     paddingHorizontal: 18,
     borderRadius: 10,
   },
   statusButton: {
-    backgroundColor: "#FF9F43",
+    backgroundColor: "#FF9F43", // Orange (For View Status)
+  },
+  bidButton: {
+    backgroundColor: "#8E24AA", // Purple (For Bid Now)
   },
   acceptText: { color: "#fff", fontSize: 13, fontWeight: "bold" },
 });

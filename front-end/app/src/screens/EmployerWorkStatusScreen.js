@@ -22,18 +22,42 @@ const EmployerWorkStatusScreen = () => {
   const [labourLocation, setLabourLocation] = useState(null);
   const mapRef = useRef(null);
 
+  // --- 1. DATA NORMALIZATION ---
+  const normalizeAndSetData = (data) => {
+    const workObj = data.work ? data.work : data;
+
+    // Check if there's an accepted bid to pull labour from
+    const acceptedBid = workObj.bids?.find((b) => b.status === "ACCEPTED");
+    const bidLabour = acceptedBid?.worker || acceptedBid?.labour;
+
+    // Grab the labour object from wherever it exists in the JSON hierarchy
+    let labourObj =
+      data.labour ||
+      workObj.acceptedLabour ||
+      workObj.labour ||
+      bidLabour ||
+      {};
+
+    const normalized = {
+      work: workObj,
+      labour: labourObj,
+      status: workObj.status || data.status || "UNKNOWN",
+    };
+
+    setWorkData(normalized);
+  };
+
+  // --- 2. LIVE LOCATION TRACKING ---
   useEffect(() => {
     let intervalId;
 
     const fetchLiveLocation = async () => {
-      // Only fetch if we have a valid labour ID and work is active
       if (!workData?.labour?.id || workData.status === "COMPLETED") return;
 
       try {
         const token = await AsyncStorage.getItem("userToken");
-        // Call the new GET endpoint
         const response = await fetch(
-          `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/employer/${workData.labour.id}`,
+          `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/employer/${workData.labour.id}/location`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },
@@ -41,7 +65,6 @@ const EmployerWorkStatusScreen = () => {
 
         if (response.ok) {
           const data = await response.json();
-          console.log("Last latitude ", data);
           if (data.lastLatitude && data.lastLongitude) {
             setLabourLocation({
               latitude: data.lastLatitude,
@@ -50,15 +73,12 @@ const EmployerWorkStatusScreen = () => {
           }
         }
       } catch (error) {
-        console.log("Live tracking error (silent):", error);
+        // Silent fail
       }
     };
 
-    // 1. Initial Call
     if (workData?.labour?.id) {
       fetchLiveLocation();
-
-      // 2. Set Interval to poll every 10 seconds
       intervalId = setInterval(fetchLiveLocation, 10000);
     }
 
@@ -67,6 +87,7 @@ const EmployerWorkStatusScreen = () => {
     };
   }, [workData?.labour?.id, workData?.status]);
 
+  // --- 3. MAP CAMERA ANIMATION ---
   useEffect(() => {
     if (labourLocation && mapRef.current) {
       mapRef.current.animateCamera(
@@ -76,47 +97,38 @@ const EmployerWorkStatusScreen = () => {
             longitude: labourLocation.longitude,
           },
           zoom: 15,
-          pitch: 0,
-          heading: 0,
         },
         { duration: 1000 },
       );
     }
   }, [labourLocation]);
 
+  // --- 4. INITIAL DATA FETCH (UPDATED) ---
   useEffect(() => {
     let isMounted = true;
 
     const fetchWorkData = async () => {
-      console.log("WorkStatusScreen Params:", params);
-
       try {
         const token = await AsyncStorage.getItem("userToken");
-        if (!token) {
-          if (isMounted)
-            Alert.alert("Auth Error", "Session expired. Please login again.");
-          return;
-        }
+        let initialData = null;
 
-        // Priority 1: Data passed via navigation
+        // 1. Instantly load whatever was passed from the previous screen
         if (params.workData) {
-          const parsed =
+          initialData =
             typeof params.workData === "string"
               ? JSON.parse(params.workData)
               : params.workData;
 
-          if (isMounted) {
-            normalizeAndSetData(parsed);
-            setLoading(false);
-          }
-          return;
+          if (isMounted) normalizeAndSetData(initialData);
         }
 
-        // Priority 2: Fetch by ID
-        if (params.workId) {
-          const API_URL = `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/employer/work-status/${params.workId}?workId=${params.workId}`;
-          console.log("Fetching from:", API_URL);
+        // 2. ALWAYS fetch the fresh data from the server to get Name and PhoneNo
+        // because the list screen payload doesn't contain them
+        const workId =
+          params.workId || initialData?.work?.id || initialData?.id;
 
+        if (workId) {
+          const API_URL = `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/employer/work-status?workId=${workId}`;
           const response = await fetch(API_URL, {
             method: "GET",
             headers: {
@@ -126,19 +138,14 @@ const EmployerWorkStatusScreen = () => {
           });
 
           if (response.ok) {
-            const data = await response.json();
-            console.log("Data", data);
-            if (isMounted) normalizeAndSetData(data);
-          } else {
-            const errorText = await response.text();
-            console.log("Server Error:", errorText);
-            if (isMounted)
-              Alert.alert("Error", "Could not fetch work details.");
+            const freshData = await response.json();
+            if (isMounted) {
+              normalizeAndSetData(freshData); // Overwrites with full name/phone
+            }
           }
         }
       } catch (error) {
         console.error("Fetch Error:", error);
-        if (isMounted) Alert.alert("Error", "Network request failed.");
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -151,15 +158,6 @@ const EmployerWorkStatusScreen = () => {
     };
   }, [params.workId, params.workData]);
 
-  const normalizeAndSetData = (data) => {
-    const normalized = {
-      work: data.work ? data.work : data,
-      labour: data.labour ? data.labour : data.work?.labour || {},
-      status: data.status || "UNKNOWN",
-    };
-    setWorkData(normalized);
-  };
-
   const handleCallLabour = () => {
     if (workData?.labour?.phoneNo) {
       Linking.openURL(`tel:${workData.labour.phoneNo}`);
@@ -169,12 +167,11 @@ const EmployerWorkStatusScreen = () => {
   };
 
   const handleMarkCompleted = async () => {
-    // Safety check: Don't allow if already completed
     if (!workData?.work || workData.status === "COMPLETED") return;
 
     Alert.alert(
       "Confirm Completion",
-      `Are you sure you want to complete this work and release ₹${workData.work.earning}?`,
+      `Are you sure you want to complete this work and release ₹${workData.work.budget || workData.work.earning}?`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -183,9 +180,10 @@ const EmployerWorkStatusScreen = () => {
           onPress: async () => {
             try {
               const token = await AsyncStorage.getItem("userToken");
+              const employerId = workData.work.employer?.id;
 
               const response = await fetch(
-                `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/employer/complete-work?workId=${workData.work.id}&employerId=${workData.work.employer.id}`,
+                `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/employer/complete-work?workId=${workData.work.id}&employerId=${employerId}`,
                 {
                   method: "PUT",
                   headers: {
@@ -197,8 +195,11 @@ const EmployerWorkStatusScreen = () => {
 
               if (response.ok) {
                 Alert.alert("Success", "Work Marked as Completed!");
-                // Update local state to reflect completion immediately
-                setWorkData((prev) => ({ ...prev, status: "COMPLETED" }));
+                setWorkData((prev) => ({
+                  ...prev,
+                  status: "COMPLETED",
+                  work: { ...prev.work, status: "COMPLETED" },
+                }));
               } else {
                 const errorText = await response.text();
                 Alert.alert("Error", errorText || "Failed to update status.");
@@ -212,7 +213,7 @@ const EmployerWorkStatusScreen = () => {
     );
   };
 
-  if (loading) {
+  if (loading && !workData) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#1B1464" />
@@ -233,9 +234,7 @@ const EmployerWorkStatusScreen = () => {
   }
 
   const { work, labour, status } = workData;
-  const hasLocation =
-    work.latitude && work.longitude && !isNaN(parseFloat(work.latitude));
-  console.log("has location ", work.longitude);
+  const hasLocation = work.latitude && work.longitude;
   const isCompleted = status === "COMPLETED";
 
   return (
@@ -263,7 +262,6 @@ const EmployerWorkStatusScreen = () => {
         </View>
 
         {/* Map Section */}
-        {/* Map Section */}
         <View style={styles.mapCard}>
           <View style={styles.mapWrapper}>
             {hasLocation ? (
@@ -278,7 +276,7 @@ const EmployerWorkStatusScreen = () => {
                   longitudeDelta: 0.01,
                 }}
               >
-                {/* 1. Static Work Location (Existing) */}
+                {/* Work Location Marker */}
                 <Marker
                   coordinate={{
                     latitude: parseFloat(work.latitude),
@@ -291,27 +289,16 @@ const EmployerWorkStatusScreen = () => {
                   </View>
                 </Marker>
 
-                {/* 2. DYNAMIC LABOUR LOCATION (This was missing) */}
+                {/* Live Labour Marker */}
                 {labourLocation && (
-                  <>
-                    <Marker
-                      coordinate={labourLocation}
-                      title={labour.name || "Labour"}
-                    >
-                      {/* Green Marker for Labour */}
-                      <View
-                        style={{
-                          backgroundColor: "#2ecc71",
-                          padding: 6,
-                          borderRadius: 20,
-                          borderWidth: 2,
-                          borderColor: "#FFF",
-                        }}
-                      >
-                        <User size={20} color="#FFF" />
-                      </View>
-                    </Marker>
-                  </>
+                  <Marker
+                    coordinate={labourLocation}
+                    title={labour.name || "Labour"}
+                  >
+                    <View style={styles.labourMarker}>
+                      <User size={20} color="#FFF" />
+                    </View>
+                  </Marker>
                 )}
               </MapView>
             ) : (
@@ -333,10 +320,12 @@ const EmployerWorkStatusScreen = () => {
             </View>
             <View style={styles.textContainer}>
               <Text style={styles.jobTitle}>
-                {labour.name || "Waiting for Labour..."}
+                {labour.name || "Assigned Worker"}
               </Text>
               <Text style={styles.subText}>
-                {labour.phoneNo ? `Phone: ${labour.phoneNo}` : "Contact Hidden"}
+                {labour.phoneNo
+                  ? `Phone: ${labour.phoneNo}`
+                  : "Contact details hidden"}
               </Text>
             </View>
             {labour.phoneNo && (
@@ -375,41 +364,26 @@ const EmployerWorkStatusScreen = () => {
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Amount</Text>
             <Text style={[styles.detailValue, { color: "#2ecc71" }]}>
-              ₹ {work.earning}
+              ₹ {work.bids?.[0]?.bidAmount || work.budget || work.earning}
             </Text>
           </View>
         </View>
 
-        {/* Footer Actions - CONDITIONAL RENDERING */}
+        {/* Footer Actions */}
         <View style={styles.footer}>
           {isCompleted ? (
-            // --- VIEW WHEN COMPLETED ---
             <View style={styles.completedBanner}>
               <CheckCircle size={24} color="#FFF" style={{ marginRight: 10 }} />
               <Text style={styles.completeBtnText}>Work Completed</Text>
             </View>
           ) : (
-            // --- VIEW WHEN ACTIVE ---
-            <>
-              <View style={styles.secureBadge}>
-                <Text style={styles.secureText}>
-                  Click the Mark Completed button only when the work is
-                  successfully completed
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.completeBtn}
-                onPress={handleMarkCompleted}
-              >
-                <CheckCircle
-                  size={24}
-                  color="#FFF"
-                  style={{ marginRight: 10 }}
-                />
-                <Text style={styles.completeBtnText}>Mark Completed</Text>
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity
+              style={styles.completeBtn}
+              onPress={handleMarkCompleted}
+            >
+              <CheckCircle size={24} color="#FFF" style={{ marginRight: 10 }} />
+              <Text style={styles.completeBtnText}>Mark Completed</Text>
+            </TouchableOpacity>
           )}
         </View>
       </ScrollView>
@@ -422,7 +396,12 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 20, paddingBottom: 100 },
   centerContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   loadingText: { marginTop: 10, color: "#666" },
-  backBtn: { backgroundColor: "#1B1464", padding: 10, borderRadius: 8 },
+  backBtn: {
+    backgroundColor: "#1B1464",
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -430,8 +409,6 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   closeBtn: { padding: 5 },
-
-  // Badge Styles
   badge: {
     backgroundColor: "#FFF4E5",
     paddingVertical: 6,
@@ -441,7 +418,6 @@ const styles = StyleSheet.create({
   badgeText: { color: "#FF9F43", fontWeight: "bold", fontSize: 14 },
   completedBadge: { backgroundColor: "#E8F5E9" },
   completedBadgeText: { color: "#2ecc71" },
-
   mapCard: {
     backgroundColor: "#FFF",
     borderRadius: 20,
@@ -464,6 +440,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 2,
     borderColor: "#1B1464",
+  },
+  labourMarker: {
+    backgroundColor: "#2ecc71",
+    padding: 6,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: "#FFF",
   },
   card: {
     backgroundColor: "#FFF",
@@ -524,15 +507,6 @@ const styles = StyleSheet.create({
   detailLabel: { fontSize: 14, color: "#666" },
   detailValue: { fontSize: 14, fontWeight: "bold", color: "#333" },
   footer: { marginTop: 10 },
-  secureBadge: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginBottom: 10,
-    gap: 5,
-  },
-  secureText: { fontSize: 12, color: "#666" },
-
-  // Button Styles
   completeBtn: {
     backgroundColor: "#1B1464",
     flexDirection: "row",

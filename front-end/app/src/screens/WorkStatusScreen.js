@@ -31,13 +31,15 @@ const WorkStatusScreen = () => {
   const lastSentLocation = useRef({ latitude: 0, longitude: 0 });
   const locationSubscription = useRef(null);
 
-  // 1. Parse Initial Data
+  // 1. Parse Initial Data sent from checkActiveJob
   useEffect(() => {
+    console.log("Raw params.workData:", params.workData);
     if (params.workData) {
       try {
         const parsed = JSON.parse(params.workData);
         setWorkData(parsed);
-        // Set initial completion state based on passed data
+
+        // Check if job is already completed based on the top-level or nested status
         if (
           parsed.work?.status === "COMPLETED" ||
           parsed.status === "COMPLETED"
@@ -50,7 +52,7 @@ const WorkStatusScreen = () => {
     }
   }, [params.workData]);
 
-  // 2. Continuous Status Polling (Check if Employer marked as Completed)
+  // 2. Continuous Status Polling (Keeping your original route as requested)
   useEffect(() => {
     let statusInterval;
 
@@ -59,7 +61,6 @@ const WorkStatusScreen = () => {
 
       try {
         const token = await AsyncStorage.getItem("userToken");
-        // Using your specific route: /work-status/{workId}
         const API_URL = `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/employer/work-status/${workData.work.id}?workId=${workData.work.id}`;
 
         const response = await fetch(API_URL, {
@@ -199,17 +200,20 @@ const WorkStatusScreen = () => {
         onBackPress,
       );
 
-      // 2. Return the cleanup function using .remove()
       return () => subscription.remove();
     }, [isCompleted]),
   );
-  if (!workData)
+
+  // Show loading spinner until workData is properly parsed
+  if (!workData || !workData.work) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#2D68FF" />
       </View>
     );
+  }
 
+  // Safely extract the nested 'work' object from the JSON response
   const { work } = workData;
 
   return (
@@ -296,18 +300,32 @@ const WorkStatusScreen = () => {
         )}
 
         {/* Employer Info */}
+        {/* Employer Info */}
         <View style={styles.card}>
           <Text style={styles.jobTitle}>{work.title}</Text>
           <Text style={styles.employerName}>
-            Employer: {work.employer?.name}
+            Employer: {work.employer?.name || "Unknown Employer"}
           </Text>
           <View style={styles.divider} />
-          <Text style={styles.earningsValue}>Earnings: ₹{work.earning}</Text>
+
+          {/* UPDATED: Safely extract bid amount from array */}
+          <Text style={styles.earningsValue}>
+            Earnings: ₹
+            {work.bids && work.bids.length > 0
+              ? work.bids[0].bidAmount
+              : work.budget}
+          </Text>
         </View>
 
         <TouchableOpacity
           style={styles.contactButton}
-          onPress={() => Linking.openURL(`tel:${work.employer?.phoneNo}`)}
+          onPress={() => {
+            if (work.employer?.phoneNo) {
+              Linking.openURL(`tel:${work.employer.phoneNo}`);
+            } else {
+              Alert.alert("Error", "No phone number available");
+            }
+          }}
         >
           <Phone size={20} color="#2196F3" />
           <Text style={styles.contactButtonText}>Call Employer</Text>

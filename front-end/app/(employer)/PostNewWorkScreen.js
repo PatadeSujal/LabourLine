@@ -5,7 +5,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
-import { useState } from "react"; // Added useEffect
+import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,53 +14,44 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
+  Switch, // IMPORT SWITCH
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import CategoryFilterModal from "../../components/RenderModal";
-// IMPORT YOUR PRICING DATA HERE
-import {
-  labourLinePricing,
-  uploadToImgBB,
-  workCategories,
-} from "../src/store/WorkData";
+import { uploadToImgBB, workCategories } from "../src/store/WorkData";
 import {
   getAddressFromCoords,
   getUserCoordinates,
 } from "../src/store/locationUtils";
 
 const PostNewWorkScreen = () => {
+  // --- FORM STATE ---
   const [jobTitle, setJobTitle] = useState("");
   const [category, setCategory] = useState("");
-  const [duration, setDuration] = useState("");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(""); // This serves as Fixed Price OR Opening Bid
+  const [description, setDescription] = useState(""); // Added manual description field
+
+  // --- BIDDING STATE ---
+  const [allowBidding, setAllowBidding] = useState(false); // Default: Fixed Price
+
+  // --- SYSTEM STATE ---
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-
-  // --- NEW STATE FOR PRICING ENGINE ---
-  const [selectedSubCategoryData, setSelectedSubCategoryData] = useState(null);
-  const [pricingModel, setPricingModel] = useState("manual"); // 'manual', 'shift', 'measurement', 'task'
-
-  // Specific inputs for different models
-  const [measurementInput, setMeasurementInput] = useState(""); // For Sq Ft / Acres
-  const [shiftType, setShiftType] = useState("fullDay"); // 'fullDay' or 'halfDay'
-  const [selectedTaskItems, setSelectedTaskItems] = useState([]); // For Electrician/Plumber items
-
-  // Location State
   const [locationMode, setLocationMode] = useState("current");
   const [address, setAddress] = useState("");
   const [coordinates, setCoordinates] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
 
-  // Media State
+  // --- MEDIA STATE ---
   const [image, setImage] = useState(null);
   const [recording, setRecording] = useState(null);
   const [audioUri, setAudioUri] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
 
-  // ... (Keep existing Audio/Image functions: startRecording, stopRecording, pickImage, handleLogout) ...
+  // --- AUDIO & IMAGE FUNCTIONS ---
   async function startRecording() {
     try {
       const permission = await Audio.requestPermissionsAsync();
@@ -69,7 +60,6 @@ const PostNewWorkScreen = () => {
           allowsRecordingIOS: true,
           playsInSilentModeIOS: true,
         });
-
         const { recording } = await Audio.Recording.createAsync(
           Audio.RecordingOptionsPresets.HIGH_QUALITY,
         );
@@ -154,97 +144,16 @@ const PostNewWorkScreen = () => {
     }
   };
 
-  // --- NEW: LOGIC TO FIND PRICING MODEL FROM CATEGORY LABEL ---
+  // --- SIMPLE CATEGORY HANDLER ---
   const handleCategorySelection = (label) => {
     setCategory(label);
     setModalVisible(false);
-
-    // Reset pricing states
-    setMeasurementInput("");
-    setShiftType("fullDay");
-    setSelectedTaskItems([]);
-    setAmount("");
-
-    // Find the deep object in labourLinePricing
-    let foundSub = null;
-    if (labourLinePricing) {
-      for (const mainCat of labourLinePricing) {
-        const sub = mainCat.subCategories.find((s) => s.label === label);
-        if (sub) {
-          foundSub = sub;
-          break;
-        }
-      }
-    }
-
-    if (foundSub && foundSub.pricing) {
-      setSelectedSubCategoryData(foundSub);
-      setPricingModel(foundSub.pricing.model);
-
-      // Auto-set initial amount if it's shift based
-      if (foundSub.pricing.model === "shift") {
-        setAmount(foundSub.pricing.rates.fullDay.toString());
-        setDuration("8 Hours");
-      }
-    } else {
-      // Fallback to manual if no pricing data found
-      setPricingModel("manual");
-      setSelectedSubCategoryData(null);
-    }
   };
 
-  // --- NEW: DYNAMIC PRICE CALCULATORS ---
-
-  // 1. Shift Calculator
-  const handleShiftSelect = (type) => {
-    setShiftType(type);
-    if (selectedSubCategoryData) {
-      const rates = selectedSubCategoryData.pricing.rates;
-      const price = type === "fullDay" ? rates.fullDay : rates.halfDay;
-      setAmount(price.toString());
-      setDuration(type === "fullDay" ? "8 Hours" : "4 Hours");
-    }
-  };
-
-  // 2. Measurement Calculator (Sq Ft / Acres)
-  const handleMeasurementChange = (val) => {
-    setMeasurementInput(val);
-    if (val && selectedSubCategoryData) {
-      const rate = selectedSubCategoryData.pricing.baseRate;
-      const total = parseFloat(val) * rate;
-      const final = Math.max(
-        total,
-        selectedSubCategoryData.pricing.minJobValue || 0,
-      );
-      setAmount(final.toString());
-      setDuration("Task Based");
-    } else {
-      setAmount("");
-    }
-  };
-
-  // 3. Task Menu Calculator
-  const toggleTaskItem = (item, price) => {
-    // Simple toggle logic for demo
-    const exists = selectedTaskItems.find((i) => i.item === item);
-    let updatedList = [];
-    if (exists) {
-      updatedList = selectedTaskItems.filter((i) => i.item !== item);
-    } else {
-      updatedList = [...selectedTaskItems, { item, price }];
-    }
-    setSelectedTaskItems(updatedList);
-
-    // Recalculate Total
-    let total = selectedSubCategoryData.pricing.visitCharge || 0;
-    updatedList.forEach((t) => (total += t.price));
-    setAmount(total.toString());
-    setDuration("Task Based");
-  };
-
+  // --- SUBMIT FUNCTION ---
   const handlePostWork = async () => {
     if (!jobTitle || !amount || !category) {
-      Alert.alert("Error", "Please fill in Job Title, Category, and Budget.");
+      Alert.alert("Error", "Please fill in Job Title, Category, and Amount.");
       return;
     }
 
@@ -258,6 +167,7 @@ const PostNewWorkScreen = () => {
       const token = await AsyncStorage.getItem("userToken");
       const decoded = jwtDecode(token);
 
+      // 1. Location Logic
       let finalLat = coordinates?.latitude;
       let finalLng = coordinates?.longitude;
 
@@ -284,6 +194,7 @@ const PostNewWorkScreen = () => {
         finalLng = 73.8567;
       }
 
+      // 2. Media Upload Logic
       const uploadAudioMedia = async (uri) => {
         const formData = new FormData();
         const filename = uri.split("/").pop();
@@ -305,7 +216,7 @@ const PostNewWorkScreen = () => {
 
       let finalAudioUrl = "none";
       let finalImageUrl =
-        "https://img.freepik.com/free-vector/construction-worker-concept-illustration_114360-5093.jpg"; // Default placeholder
+        "https://img.freepik.com/free-vector/construction-worker-concept-illustration_114360-5093.jpg";
 
       if (audioUri) finalAudioUrl = await uploadAudioMedia(audioUri);
       if (image) {
@@ -313,28 +224,26 @@ const PostNewWorkScreen = () => {
         if (imgbbUrl) finalImageUrl = imgbbUrl;
       }
 
-      // --- ENHANCED DESCRIPTION ---
-      // Append the pricing details to the description so the worker sees exactly what the job entails
-      let enhancedDescription = `Duration: ${duration}. `;
-      if (pricingModel === "measurement")
-        enhancedDescription += `Scope: ${measurementInput} ${selectedSubCategoryData.pricing.unit}. `;
-      if (pricingModel === "task_based") {
-        const taskNames = selectedTaskItems.map((t) => t.item).join(", ");
-        enhancedDescription += `Tasks: ${taskNames}. `;
-      }
-
+      // 3. CONSTRUCT PAYLOAD
       const payload = {
         title: jobTitle,
-        description: enhancedDescription,
-        audioUrl: finalAudioUrl,
+        description: description || "No additional details provided.",
         skillsRequired: category,
-        earning: parseFloat(amount),
+
+        // --- PRICING DATA SENT TO BACKEND ---
+        budget: parseFloat(amount),
+        isBiddingAllowed: allowBidding,
+        // ------------------------------------
+
         location: address || "Pune, Maharashtra",
         latitude: finalLat,
         longitude: finalLng,
         image: finalImageUrl,
+        audioUrl: finalAudioUrl,
         employerId: decoded.id,
       };
+
+      console.log("Posting Payload:", payload);
 
       const response = await fetch(
         `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/employer/post-work`,
@@ -352,152 +261,15 @@ const PostNewWorkScreen = () => {
         Alert.alert("Success", "Work posted successfully!", [
           { text: "OK", onPress: () => router.replace("YouPostedScreen") },
         ]);
+      } else {
+        const err = await response.text();
+        Alert.alert("Error", "Server Error: " + err);
       }
     } catch (error) {
       console.error(error);
       Alert.alert("Network Error", "Could not connect to the server.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  // --- COMPONENT: RENDER PRICING SECTION ---
-  const renderPricingSection = () => {
-    // 1. MANUAL OR DEFAULT
-    if (pricingModel === "manual") {
-      return (
-        <View style={styles.amountContainer}>
-          <FontAwesome5
-            name="rupee-sign"
-            size={18}
-            color="#FFC107"
-            style={styles.rupeeIcon}
-          />
-          <TextInput
-            style={styles.amountInput}
-            placeholder="500"
-            keyboardType="numeric"
-            value={amount}
-            onChangeText={setAmount}
-          />
-        </View>
-      );
-    }
-
-    // 2. SHIFT BASED (Full Day / Half Day)
-    if (pricingModel === "shift") {
-      return (
-        <View style={styles.shiftContainer}>
-          <TouchableOpacity
-            style={[
-              styles.shiftBtn,
-              shiftType === "fullDay" && styles.shiftBtnActive,
-            ]}
-            onPress={() => handleShiftSelect("fullDay")}
-          >
-            <Text
-              style={[
-                styles.shiftText,
-                shiftType === "fullDay" && styles.shiftTextActive,
-              ]}
-            >
-              Full Day (8h){"\n"}₹
-              {selectedSubCategoryData.pricing.rates.fullDay}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.shiftBtn,
-              shiftType === "halfDay" && styles.shiftBtnActive,
-            ]}
-            onPress={() => handleShiftSelect("halfDay")}
-          >
-            <Text
-              style={[
-                styles.shiftText,
-                shiftType === "halfDay" && styles.shiftTextActive,
-              ]}
-            >
-              Half Day (4h){"\n"}₹
-              {selectedSubCategoryData.pricing.rates.halfDay}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
-    // 3. MEASUREMENT BASED (Sq Ft)
-    if (pricingModel === "measurement") {
-      return (
-        <View>
-          <View style={styles.amountContainer}>
-            <Text style={{ fontWeight: "bold", color: "#555" }}>
-              Area ({selectedSubCategoryData.pricing.unit}):{" "}
-            </Text>
-            <TextInput
-              style={styles.amountInput}
-              placeholder="e.g. 100"
-              keyboardType="numeric"
-              value={measurementInput}
-              onChangeText={handleMeasurementChange}
-            />
-          </View>
-          <Text style={styles.helperText}>
-            Standard Rate: ₹{selectedSubCategoryData.pricing.baseRate}/
-            {selectedSubCategoryData.pricing.unit}
-          </Text>
-          {amount !== "" && (
-            <Text style={styles.calculatedText}>Total Est: ₹{amount}</Text>
-          )}
-        </View>
-      );
-    }
-
-    // 4. TASK BASED (Menu)
-    if (pricingModel === "task_based") {
-      return (
-        <View>
-          <Text style={styles.sectionHeader}>
-            Select Tasks (Includes ₹
-            {selectedSubCategoryData.pricing.visitCharge} visit fee)
-          </Text>
-          {selectedSubCategoryData.pricing.rateCard.map((item, index) => {
-            const isSelected = selectedTaskItems.some(
-              (i) => i.item === item.item,
-            );
-            return (
-              <TouchableOpacity
-                key={index}
-                style={[styles.taskItem, isSelected && styles.taskItemActive]}
-                onPress={() => toggleTaskItem(item.item, item.price)}
-              >
-                <Text
-                  style={
-                    isSelected
-                      ? { color: "white", fontWeight: "bold" }
-                      : { color: "#333" }
-                  }
-                >
-                  {item.item}
-                </Text>
-                <Text
-                  style={
-                    isSelected
-                      ? { color: "white", fontWeight: "bold" }
-                      : { color: "#0D47A1", fontWeight: "bold" }
-                  }
-                >
-                  ₹{item.price}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-          <View style={styles.totalBox}>
-            <Text style={styles.totalText}>Total Budget: ₹{amount || 0}</Text>
-          </View>
-        </View>
-      );
     }
   };
 
@@ -527,7 +299,7 @@ const PostNewWorkScreen = () => {
         </View>
 
         <View style={styles.formBody}>
-          {/* ... Job Title Input ... */}
+          {/* 1. JOB TITLE */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>JOB TITLE</Text>
             <View style={styles.inputWrapper}>
@@ -546,62 +318,102 @@ const PostNewWorkScreen = () => {
             </View>
           </View>
 
-          {/* ... Category & Duration ... */}
-          <View style={styles.rowContainer}>
-            <View style={[styles.inputContainer, styles.halfWidth]}>
-              <Text style={styles.label}>CATEGORY</Text>
-              <TouchableOpacity
-                style={styles.dropdown}
-                onPress={() => setModalVisible(true)}
+          {/* 2. CATEGORY */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>CATEGORY</Text>
+            <TouchableOpacity
+              style={styles.dropdown}
+              onPress={() => setModalVisible(true)}
+            >
+              <MaterialIcons
+                name="category"
+                size={20}
+                color="#0D47A1"
+                style={styles.inputIcon}
+              />
+              <Text
+                style={[styles.dropdownText, !category && { color: "#999" }]}
               >
-                <MaterialIcons
-                  name="category"
-                  size={20}
-                  color="#0D47A1"
-                  style={styles.inputIcon}
+                {category || "Select"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* 3. SIMPLIFIED PRICING SECTION */}
+          {/* 3. SIMPLIFIED PRICING SECTION */}
+          <View style={styles.pricingWrapper}>
+            <View style={styles.switchRow}>
+              <Text style={styles.label}>PRICING MODEL</Text>
+
+              {/* TOGGLE CONTAINER */}
+              <View style={styles.switchContainer}>
+                {/* Option 1: Fixed Price Label */}
+                <TouchableOpacity onPress={() => setAllowBidding(false)}>
+                  <Text
+                    style={[
+                      styles.switchText,
+                      !allowBidding && styles.activeSwitchText,
+                    ]}
+                  >
+                    Fixed Price
+                  </Text>
+                </TouchableOpacity>
+
+                {/* The Switch Component */}
+                <Switch
+                  trackColor={{ false: "#767577", true: "#81b0ff" }}
+                  thumbColor={allowBidding ? "#0D47A1" : "#f4f3f4"}
+                  ios_backgroundColor="#3e3e3e"
+                  onValueChange={(val) => setAllowBidding(val)} // Explicitly pass value
+                  value={allowBidding}
+                  style={{ marginHorizontal: 10 }}
                 />
-                <Text
-                  style={[styles.dropdownText, !category && { color: "#999" }]}
-                >
-                  {category || "Select"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <View style={[styles.inputContainer, styles.halfWidth]}>
-              <Text style={styles.label}>DURATION</Text>
-              <View
-                style={[styles.inputWrapper, { backgroundColor: "#f0f0f0" }]}
-              >
-                <MaterialIcons
-                  name="schedule"
-                  size={20}
-                  color="#0D47A1"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={[styles.input, { color: "#555" }]}
-                  placeholder="Auto-calc"
-                  value={duration}
-                  editable={false} // Make Duration Auto-Calculated mostly
-                />
+
+                {/* Option 2: Bidding Label */}
+                <TouchableOpacity onPress={() => setAllowBidding(true)}>
+                  <Text
+                    style={[
+                      styles.switchText,
+                      allowBidding && styles.activeSwitchText,
+                    ]}
+                  >
+                    Allow Bidding
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
-          </View>
 
-          {/* ... DYNAMIC PRICING SECTION ... */}
-          <View style={styles.pricingWrapper}>
-            <Text style={styles.label}>
-              {pricingModel === "manual"
-                ? "BUDGET"
-                : "CALCULATED BUDGET (Standard Rates applied)"}
+            <Text style={[styles.label, { marginTop: 15 }]}>
+              {allowBidding ? "ESTIMATED BUDGET / OPENING BID" : "FIXED AMOUNT"}
             </Text>
 
-            {renderPricingSection()}
+            <View style={styles.amountContainer}>
+              <FontAwesome5
+                name="rupee-sign"
+                size={18}
+                color="#FFC107"
+                style={styles.rupeeIcon}
+              />
+              <TextInput
+                style={styles.amountInput}
+                placeholder={
+                  allowBidding ? "e.g. 500 (Start)" : "e.g. 500 (Exact)"
+                }
+                keyboardType="numeric"
+                value={amount}
+                onChangeText={setAmount}
+              />
+            </View>
+
+            <Text style={styles.helperText}>
+              {allowBidding
+                ? "Workers can send offers. You choose the best price."
+                : "Workers can only accept this exact amount. Good for urgent jobs."}
+            </Text>
           </View>
 
-          {/* ... Media Buttons ... */}
-          <View style={[styles.mediaRow, { marginTop: 20 }]}>
-            {/* ... Keep your existing Media Buttons code exactly as is ... */}
+          {/* 5. MEDIA BUTTONS */}
+          <View style={styles.mediaRow}>
             <TouchableOpacity
               style={[
                 styles.mediaButton,
@@ -632,7 +444,6 @@ const PostNewWorkScreen = () => {
             </TouchableOpacity>
           </View>
 
-          {/* ... Image Preview Code ... */}
           {image && (
             <View style={styles.imagePreviewContainer}>
               <Image source={{ uri: image }} style={styles.imagePreview} />
@@ -645,11 +456,10 @@ const PostNewWorkScreen = () => {
             </View>
           )}
 
-          {/* ... LOCATION SECTION (Keep exactly as before) ... */}
+          {/* 6. LOCATION SECTION */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>WORK LOCATION</Text>
             <View style={styles.locationToggle}>
-              {/* ... Keep your existing location toggle buttons ... */}
               <TouchableOpacity
                 style={[
                   styles.toggleButton,
@@ -721,7 +531,7 @@ const PostNewWorkScreen = () => {
             )}
           </View>
 
-          {/* ... SUBMIT BUTTON ... */}
+          {/* 7. SUBMIT BUTTON */}
           <TouchableOpacity
             style={[styles.submitButton, loading && { opacity: 0.7 }]}
             onPress={handlePostWork}
@@ -738,7 +548,9 @@ const PostNewWorkScreen = () => {
                   style={{ marginRight: 8 }}
                 />
                 <Text style={styles.submitButtonText}>
-                  {amount ? `Post Job for ₹${amount}` : "Post Work"}
+                  {allowBidding
+                    ? "Post & Wait for Bids"
+                    : "Post Fixed Price Job"}
                 </Text>
               </>
             )}
@@ -784,8 +596,6 @@ const styles = StyleSheet.create({
   },
   inputIcon: { marginLeft: 12 },
   input: { flex: 1, padding: 10, fontSize: 16, color: "#000" },
-  rowContainer: { flexDirection: "row", justifyContent: "space-between" },
-  halfWidth: { width: "48%" },
   dropdown: {
     flexDirection: "row",
     alignItems: "center",
@@ -797,6 +607,55 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   dropdownText: { fontSize: 14, color: "#000", flex: 1, marginLeft: 10 },
+
+  // --- PRICING SECTION STYLES ---
+  pricingWrapper: {
+    backgroundColor: "#f1f8ff",
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#bbdefb",
+  },
+  switchRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  switchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  switchText: {
+    fontSize: 12,
+    color: "#888",
+    fontWeight: "600",
+  },
+  activeSwitchText: {
+    color: "#0D47A1",
+    fontWeight: "bold",
+  },
+  amountContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E0E7FF",
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    height: 50,
+    paddingHorizontal: 10,
+    marginTop: 5,
+  },
+  rupeeIcon: { marginRight: 10 },
+  amountInput: { flex: 1, fontSize: 18, fontWeight: "700", color: "#0D47A1" },
+  helperText: {
+    fontSize: 12,
+    color: "#777",
+    marginTop: 5,
+    fontStyle: "italic",
+  },
+
+  // --- MEDIA STYLES ---
   mediaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -831,6 +690,8 @@ const styles = StyleSheet.create({
     padding: 5,
     borderRadius: 20,
   },
+
+  // --- LOCATION STYLES ---
   locationToggle: {
     flexDirection: "row",
     backgroundColor: "#E0E7FF",
@@ -864,18 +725,7 @@ const styles = StyleSheet.create({
   },
   detectButtonText: { color: "#fff", fontWeight: "bold", marginLeft: 8 },
   detectedAddress: { marginTop: 10, fontSize: 14, color: "#333" },
-  amountContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E0E7FF",
-    borderRadius: 12,
-    backgroundColor: "#fff",
-    height: 50,
-    paddingHorizontal: 10,
-  },
-  rupeeIcon: { marginRight: 10 },
-  amountInput: { flex: 1, fontSize: 18, fontWeight: "700", color: "#0D47A1" },
+
   submitButton: {
     backgroundColor: "#0D47A1",
     padding: 16,
@@ -885,88 +735,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   submitButtonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-
-  // --- NEW STYLES FOR PRICING ---
-  pricingWrapper: {
-    backgroundColor: "#f1f8ff",
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "#bbdefb",
-  },
-  shiftContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  shiftBtn: {
-    width: "48%",
-    padding: 15,
-    backgroundColor: "white",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    alignItems: "center",
-  },
-  shiftBtnActive: {
-    backgroundColor: "#e3f2fd",
-    borderColor: "#0D47A1",
-    borderWidth: 2,
-  },
-  shiftText: {
-    textAlign: "center",
-    color: "#555",
-    lineHeight: 20,
-  },
-  shiftTextActive: {
-    color: "#0D47A1",
-    fontWeight: "bold",
-  },
-  helperText: {
-    fontSize: 12,
-    color: "#777",
-    marginTop: 5,
-    fontStyle: "italic",
-  },
-  calculatedText: {
-    marginTop: 10,
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#2e7d32",
-    textAlign: "right",
-  },
-  sectionHeader: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#777",
-    marginBottom: 10,
-  },
-  taskItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 12,
-    backgroundColor: "white",
-    marginBottom: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#eee",
-  },
-  taskItemActive: {
-    backgroundColor: "#0D47A1",
-    borderColor: "#0D47A1",
-  },
-  totalBox: {
-    marginTop: 10,
-    padding: 10,
-    backgroundColor: "#fff3e0",
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  totalText: {
-    fontWeight: "bold",
-    color: "#e65100",
-    fontSize: 16,
-  },
 });
 
 export default PostNewWorkScreen;

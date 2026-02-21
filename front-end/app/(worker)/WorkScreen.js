@@ -1,10 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
-
-import { useEffect, useState } from "react"; // Added useEffect
+import { router, useFocusEffect } from "expo-router";
+import { jwtDecode } from "jwt-decode"; // Make sure to install: npm install jwt-decode
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert, // Added for loading state
+  Alert,
+  Modal,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -16,6 +17,8 @@ import {
   View,
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
+
+// COMPONENTS
 import JobCard from "../../components/JobCard";
 import CategoryFilterModal from "../../components/RenderModal";
 import { filterData } from "../src/store/WorkData";
@@ -23,11 +26,11 @@ import {
   getCurrentAddress,
   getUserCoordinates,
 } from "../src/store/locationUtils";
-import { acceptWorkApi } from "../src/store/workService";
+import { acceptWorkApi, getActiveWorkApi } from "../src/store/workService";
 
 const WorkScreen = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [jobs, setJobs] = useState([]); // State for API data
+  const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilters, setActiveFilters] = useState({
@@ -35,52 +38,64 @@ const WorkScreen = () => {
     maxDistance: null,
     minEarning: null,
   });
+
+  // --- BIDDING STATE ---
+  const [bidModalVisible, setBidModalVisible] = useState(false);
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [bidAmount, setBidAmount] = useState("");
+  const [bidComment, setBidComment] = useState("");
+  const [bidLoading, setBidLoading] = useState(false);
+
+  // --- FILTER STATE ---
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalTitle, setModalTitle] = useState("Filters");
   const [currentOptions, setCurrentOptions] = useState(filterData.price);
   const [liveLocation, setLiveLocation] = useState("Fetching location...");
-  const handleFilterSelection = async (label) => {
-    const distanceMatch = label.match(/\d+/);
-    if (!distanceMatch) return;
 
-    const distanceValue = parseInt(distanceMatch[0]);
+  useFocusEffect(
+    useCallback(() => {
+      let intervalId;
 
-    setModalVisible(false);
-    setLoading(true);
+      const checkActiveJob = async () => {
+        const activeData = await getActiveWorkApi();
+        console.log("Active Job data:", activeData);
 
-    try {
-      const coords = await getUserCoordinates();
+        if (activeData) {
+          clearInterval(intervalId);
 
-      if (coords) {
-        const newFilters = {
-          ...activeFilters,
-          maxDistance: distanceValue,
-          userLat: coords.latitude,
-          userLng: coords.longitude,
-        };
+          // NAVIGATE to Status Screen and pass the raw JSON string
+          router.replace({
+            pathname: "/src/screens/WorkStatusScreen",
+            params: {
+              workData: JSON.stringify(activeData), // Sending the whole object
+            },
+          });
+        }
+      };
+      // Run immediately once
+      checkActiveJob();
 
-        setActiveFilters(newFilters);
-        fetchJobs(newFilters);
-      } else {
-        Alert.alert("Location Error", "Could not get your location.");
-        setLoading(false);
-      }
-    } catch (error) {
-      console.error(error);
-      setLoading(false);
-    }
-  };
+      // Then poll every 5 seconds
+      intervalId = setInterval(checkActiveJob, 5000);
 
-  const applyFinalFilter = (value) => {
-    console.log("Applying filter:", value);
-    // Logic to update your API payload here
-    setModalVisible(false);
-  };
+      // Cleanup on blur (screen change)
+      return () => {
+        if (intervalId) clearInterval(intervalId);
+      };
+    }, []),
+  );
 
-  const resetToMainMenu = () => {
-    setModalTitle("Filters");
-    setCurrentOptions(filterData.main);
-  };
+  // --- 1. INITIALIZATION ---
+  useEffect(() => {
+    const initializeLocation = async () => {
+      const address = await getCurrentAddress();
+      setLiveLocation(address || "Location Not Found");
+    };
+
+    initializeLocation();
+    fetchJobs();
+  }, []);
+
+  // --- 2. API CALLS ---
   const fetchJobs = async (filtersToApply = {}) => {
     setLoading(true);
     try {
@@ -93,8 +108,7 @@ const WorkScreen = () => {
         url += `userLng=${filtersToApply.userLng}&`;
       }
 
-      console.log("Fetching with distance filter:", url);
-
+      console.log("Fetching jobs:", url);
       const response = await fetch(url, {
         method: "GET",
         headers: { Authorization: `Bearer ${token}` },
@@ -111,26 +125,15 @@ const WorkScreen = () => {
       setRefreshing(false);
     }
   };
-  useEffect(() => {
-    // Use the generalized function
-    const initializeLocation = async () => {
-      const address = await getCurrentAddress();
-      if (address) {
-        setLiveLocation(address);
-      } else {
-        setLiveLocation("Location Not Found"); // Default fallback
-      }
-    };
-
-    initializeLocation();
-    fetchJobs();
-  }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchJobs();
+    fetchJobs(activeFilters);
   };
 
+  // --- 3. HANDLE ACTIONS ---
+
+  // ACTION A: Accept Work (Existing Logic)
   const handleAcceptWork = async (workId) => {
     setLoading(true);
     try {
@@ -139,7 +142,6 @@ const WorkScreen = () => {
 
       Alert.alert("Success", "Work Accepted!");
 
-      // Navigate using the returned data
       router.push({
         pathname: "/src/screens/WorkStatusScreen",
         params: {
@@ -153,7 +155,87 @@ const WorkScreen = () => {
     }
   };
 
-  // Filter jobs based on search input
+  // ACTION B: Submit Bid (New Logic)
+  const submitBid = async () => {
+    if (!bidAmount) {
+      Alert.alert("Error", "Please enter an amount");
+      return;
+    }
+
+    setBidLoading(true);
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      const decoded = jwtDecode(token);
+      const labourId = decoded.id; // Or however you store the ID
+
+      const payload = {
+        workId: selectedJob.id,
+        labourId: labourId,
+        bidAmount: parseFloat(bidAmount),
+        comment: bidComment,
+      };
+
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/labour/bid`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+
+      if (response.ok) {
+        Alert.alert("Success", "Bid sent successfully!");
+        setBidModalVisible(false);
+        setBidAmount("");
+        setBidComment("");
+      } else {
+        const errText = await response.text();
+        Alert.alert("Error", errText || "Failed to place bid");
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Network request failed");
+    } finally {
+      setBidLoading(false);
+    }
+  };
+
+  // --- 4. FILTERS ---
+  const handleFilterSelection = async (label) => {
+    console.log("Filter label ", label);
+    const distanceMatch = label.match(/\d+/);
+    console.log("Filter label ", distanceMatch);
+    if (!distanceMatch) return;
+
+    const distanceValue = parseInt(distanceMatch[0]);
+    setModalVisible(false);
+    setLoading(true);
+
+    try {
+      const coords = await getUserCoordinates();
+      if (coords) {
+        const newFilters = {
+          ...activeFilters,
+          maxDistance: distanceValue,
+          userLat: coords.latitude,
+          userLng: coords.longitude,
+        };
+        setActiveFilters(newFilters);
+        fetchJobs(newFilters);
+      } else {
+        Alert.alert("Location Error", "Could not get your location.");
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error(error);
+      setLoading(false);
+    }
+  };
+
   const filteredJobs = jobs.filter(
     (job) =>
       job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -176,13 +258,18 @@ const WorkScreen = () => {
         title="Select Distance"
       />
 
+      {/* HEADER */}
       <View style={styles.headerContainer}>
         <View style={styles.headerTopRow}>
           <View>
             <Text style={styles.headerTitle}>Select Work</Text>
             <View style={styles.locationPill}>
               <Icon name="location-outline" size={16} color="#000" />
-              <Text style={styles.locationText}>{liveLocation}</Text>
+              <Text style={styles.locationText}>
+                {liveLocation.length > 25
+                  ? liveLocation.substring(0, 25) + "..."
+                  : liveLocation}
+              </Text>
             </View>
           </View>
           <TouchableOpacity style={styles.notificationButton}>
@@ -216,6 +303,7 @@ const WorkScreen = () => {
         </View>
       </View>
 
+      {/* CONTENT */}
       {loading ? (
         <ActivityIndicator
           size="large"
@@ -225,7 +313,7 @@ const WorkScreen = () => {
       ) : (
         <ScrollView
           style={styles.contentContainer}
-          contentContainerStyle={{ paddingBottom: 20 }}
+          contentContainerStyle={{ paddingBottom: 50 }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -236,8 +324,13 @@ const WorkScreen = () => {
               <JobCard
                 key={job.id}
                 job={job}
-                // onAccept={handleAcceptWork}
-                mainText={"Accept"}
+                onAccept={() => handleAcceptWork(job.id)}
+                mainText={job.isBiddingAllowed ? "Bid Now" : "Accept"}
+                onPressAction={(job) => {
+                  setSelectedJob(job);
+                  setBidAmount(job.budget ? job.budget.toString() : "");
+                  setBidModalVisible(true);
+                }}
               />
             ))
           ) : (
@@ -245,19 +338,67 @@ const WorkScreen = () => {
           )}
         </ScrollView>
       )}
+
+      {/* --- BIDDING MODAL --- */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={bidModalVisible}
+        onRequestClose={() => setBidModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Place Your Bid</Text>
+            <Text style={styles.modalSubtitle}>
+              Budget: ₹{selectedJob?.budget || selectedJob?.earning || "N/A"}
+            </Text>
+
+            <Text style={styles.label}>Your Offer (₹)</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              placeholder="e.g. 600"
+              value={bidAmount}
+              onChangeText={setBidAmount}
+            />
+
+            <Text style={styles.label}>Comment (Optional)</Text>
+            <TextInput
+              style={[styles.input, { height: 80, textAlignVertical: "top" }]}
+              multiline
+              placeholder="I can do this job efficiently..."
+              value={bidComment}
+              onChangeText={setBidComment}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.btn, styles.btnCancel]}
+                onPress={() => setBidModalVisible(false)}
+              >
+                <Text style={styles.btnTextCancel}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.btn, styles.btnSubmit]}
+                onPress={submitBid}
+                disabled={bidLoading}
+              >
+                {bidLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.btnTextSubmit}>Send Bid</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
 
-const additionalStyles = StyleSheet.create({
-  noJobsText: {
-    textAlign: "center",
-    marginTop: 40,
-    color: "#888",
-    fontSize: 16,
-  },
-});
-
+// --- STYLES ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -339,6 +480,79 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     padding: 20,
+  },
+  noJobsText: {
+    textAlign: "center",
+    marginTop: 40,
+    color: "#888",
+    fontSize: 16,
+  },
+
+  // --- MODAL STYLES (ADDED) ---
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: "white",
+    borderRadius: 15,
+    padding: 20,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 5,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  label: {
+    fontWeight: "600",
+    marginBottom: 5,
+    color: "#333",
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 16,
+    marginBottom: 15,
+    backgroundColor: "#f9f9f9",
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+  btn: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginHorizontal: 5,
+  },
+  btnCancel: {
+    backgroundColor: "#eee",
+  },
+  btnSubmit: {
+    backgroundColor: "#FF9F43",
+  },
+  btnTextCancel: {
+    color: "#333",
+    fontWeight: "bold",
+  },
+  btnTextSubmit: {
+    color: "white",
+    fontWeight: "bold",
   },
 });
 

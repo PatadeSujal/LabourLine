@@ -6,6 +6,7 @@ import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -18,20 +19,23 @@ import JobCard from "../../components/JobCard";
 const YouPostedScreen = () => {
   const [postedJobs, setPostedJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const fetchMyJobs = async () => {
     try {
       const token = await AsyncStorage.getItem("userToken");
       if (!token) {
-        router.replace("/src/screen/LoginScreen");
+        Alert.alert("Error", "Authentication token missing.");
         return;
       }
 
       const decoded = jwtDecode(token);
       const userId = decoded.id;
 
-      // Update IP to match your current server address
+      // Ensure this endpoint returns ALL your active jobs (Open + Accepted)
       const API_URL = `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/employer/${userId}/my-open-work`;
+
+      console.log("Fetching jobs from:", API_URL);
 
       const response = await fetch(API_URL, {
         method: "GET",
@@ -43,25 +47,30 @@ const YouPostedScreen = () => {
 
       if (response.ok) {
         const data = await response.json();
-        // console.log(data);
-        // Mapping API data to match your JobCard's expected prop structure
+
+        // Map API data to JobCard props, BUT preserve raw data with "...job"
         const mappedJobs = data.map((job) => ({
-          id: job.id,
+          ...job, // CRITICAL: Keep raw data (like acceptedLabour) for the Status Screen
+
+          // UI Mappings for JobCard
           category: job.skillsRequired || "General",
           title: job.title,
+          budget: job.budget,
           postedTime: job.status === "OPEN" ? "Active Now" : job.status,
-          // Extracting duration from description if formatted as "Duration: 6..."
           duration: job.description?.includes("Duration:")
             ? job.description.split(".")[0].replace("Duration: ", "") + " hrs"
             : "N/A",
-          salary: job.earning ? job.earning.toString() : "0",
+          salary: job.budget ? job.budget.toString() : "0",
           distance: job.location || "Pune",
-          // Fix: Passing image as a string to avoid casting errors in JobCard
           image: job.image || "https://via.placeholder.com/150",
+
+          // Ensure boolean is set correctly for UI logic
+          isBiddingAllowed: job.isBiddingAllowed,
         }));
 
         setPostedJobs(mappedJobs);
       } else {
+        // console.error("API Error:", await response.text());
         Alert.alert("Error", "Failed to load your posted jobs.");
       }
     } catch (error) {
@@ -69,23 +78,42 @@ const YouPostedScreen = () => {
       Alert.alert("Connection Error", "Could not reach the server.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
+
+  // Poll for updates when screen is in focus
   useFocusEffect(
     useCallback(() => {
       fetchMyJobs();
-
-      return () => {};
     }, []),
   );
 
-  const handleViewStatus = (id) => {
-    router.push({
-      pathname: "/src/screens/EmployerWorkStatusScreen",
-      params: {
-        workId: id,
-      },
-    });
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchMyJobs();
+  };
+
+  const handleViewStatus = (work) => {
+    console.log("this is handle view status");
+    console.log("Handling Action for Job ID:", work.id);
+    console.log("Is Bidding Allowed?", work.isBiddingAllowed);
+
+    // CASE 1: Bidding is NO LONGER allowed -> Go to Status Screen
+    if (!work.isBiddingAllowed || work.status == "ACCEPTED") {
+      router.push({
+        pathname: "/src/screens/EmployerWorkStatusScreen",
+        params: {
+          workData: JSON.stringify(work),
+        },
+      });
+    } else {
+      // CASE 2: Bidding IS allowed -> Go to View Bids Screen
+      router.push({
+        pathname: "/src/screens/ViewBidsScreen",
+        params: { workId: work.id },
+      });
+    }
   };
 
   return (
@@ -109,14 +137,23 @@ const YouPostedScreen = () => {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         >
           {postedJobs.length > 0 ? (
             postedJobs.map((item) => (
               <JobCard
                 key={item.id}
                 job={item}
-                mainText={"View Status"}
-                onAccept={() => handleViewStatus(item.id)}
+                // 1. DYNAMIC BUTTON TEXT
+                // If bidding is allowed, show "View Bids", else "View Status"
+                mainText={item.isBiddingAllowed ? "View Bids" : "View Status"}
+                // 2. ACTION HANDLERS
+                // JobCard calls 'onPressAction' if isBiddingAllowed is true
+                onPressAction={() => handleViewStatus(item)}
+                // JobCard calls 'onAccept' if mainText is "View Status"
+                onAccept={() => handleViewStatus(item)}
               />
             ))
           ) : (
