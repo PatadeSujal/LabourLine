@@ -1,5 +1,6 @@
 import { Audio } from "expo-av";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Image,
@@ -15,7 +16,8 @@ import {
 } from "../app/src/store/locationUtils";
 
 const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
-  const [distanceText, setDistanceText] = useState("Locating...");
+  const { t } = useTranslation();
+  const [distanceText, setDistanceText] = useState(t('jobCard.locating'));
   const [sound, setSound] = useState(null);
 
   // Helper to check if this is a bidding job
@@ -48,12 +50,12 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
             job.latitude,
             job.longitude,
           );
-          setDistanceText(`${dist} km`);
+          setDistanceText(`${dist} ${t('jobCard.km')}`);
         } else if (isMounted) {
-          setDistanceText(job.location ? job.location.split(",")[0] : "Pune");
+          setDistanceText(job.location ? job.location.split(",")[0] : t('jobCard.defaultLocation'));
         }
       } catch (err) {
-        if (isMounted) setDistanceText("Pune");
+        if (isMounted) setDistanceText(t('jobCard.defaultLocation'));
       }
     };
     getDistance();
@@ -65,7 +67,7 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
   async function playSound() {
     const audioUrl = job.audioUrl;
     if (!audioUrl || audioUrl === "none") {
-      Alert.alert("No Audio", "This job has no voice description.");
+      Alert.alert(t('jobCard.noAudio'), t('jobCard.noVoiceDescription'));
       return;
     }
     try {
@@ -82,7 +84,7 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
         }
       });
     } catch (error) {
-      Alert.alert("Error", "Could not play audio.");
+      Alert.alert(t('common.error'), t('jobCard.couldNotPlayAudio'));
     }
   }
 
@@ -96,9 +98,9 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
 
   const getDuration = () => {
     if (job.description?.includes("Duration:")) {
-      return job.description.split(".")[0].replace("Duration: ", "") + " Hrs";
+      return job.description.split(".")[0].replace("Duration: ", "") + " " + t('jobCard.hrs');
     }
-    return job.duration || "8 Hrs";
+    return job.duration || t('jobCard.defaultDuration');
   };
 
   return (
@@ -106,10 +108,10 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
       <View style={styles.cardHeader}>
         <View style={styles.tagContainer}>
           <Text style={styles.tagText}>
-            {job.skillsRequired || job.category || "General"}
+            {job.skillsRequired || job.category || t('common.general')}
           </Text>
         </View>
-        <Text style={styles.timeText}>{job.postedTime || "Active"}</Text>
+        <Text style={styles.timeText}>{job.postedTime || t('common.active')}</Text>
       </View>
 
       <View style={styles.contentRow}>
@@ -147,7 +149,7 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
           <View style={styles.footerRow}>
             <View>
               <Text style={styles.earningLabel}>
-                {isBidding ? "Budget" : "Earning"}
+                {isBidding ? t('jobCard.budget') : t('jobCard.earning')}
               </Text>
               <Text style={styles.earningValue}>
                 ₹ {job.budget || job.salary}
@@ -164,7 +166,7 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
               activeOpacity={0.8}
             >
               <Text style={styles.acceptText}>
-                {mainText || (isBidding ? "Bid Now" : "Accept")}
+                {mainText || (isBidding ? t('jobCard.bidNow') : t('jobCard.accept'))}
               </Text>
             </TouchableOpacity>
           </View>

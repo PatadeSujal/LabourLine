@@ -1,7 +1,9 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 export default function EmployerTabLayout() {
+  const { t } = useTranslation();
   return (
     <Tabs
       screenOptions={{
@@ -13,21 +15,21 @@ export default function EmployerTabLayout() {
         <Tabs.Screen
           name="YouPostedScreen"
           options={{
-            title: 'My Ads',
+            title: t('tabs.myAds'),
             tabBarIcon: ({ color }) => <MaterialIcons name="home" size={24} color={color} />,
           }}
         />
       <Tabs.Screen
         name="PostNewWorkScreen"
         options={{
-          title: 'Post Job',
+          title: t('tabs.postJob'),
           tabBarIcon: ({ color }) => <MaterialIcons name="post-add" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="ProfileScreen"
         options={{
-          title: 'Profile',
+          title: t('tabs.profile'),
           tabBarIcon: ({ color }) => <MaterialIcons name="person" size={24} color={color} />,
         }}
       />

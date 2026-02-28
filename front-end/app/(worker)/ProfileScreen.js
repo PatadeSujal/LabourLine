@@ -3,23 +3,49 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { jwtDecode } from "jwt-decode";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
+import CategoryFilterModal from "../../components/RenderModal";
+import i18n from "../../i18n";
 
 const ProfileScreen = () => {
+  const { t } = useTranslation();
   const router = useRouter();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [langModalVisible, setLangModalVisible] = useState(false);
   const params = useLocalSearchParams();
+
+  const languages = [
+    { id: "1", label: "English", color: "#4E342E", code: "en" },
+    { id: "2", label: "हिंदी", color: "#FF5E57", code: "hi" },
+    { id: "3", label: "मराठी", color: "#FF9F43", code: "mr" },
+    { id: "4", label: "മലയാളം", color: "#D980FA", code: "ml" },
+    { id: "5", label: "ਪੰਜਾਬੀ", color: "#FBC531", code: "pa" },
+    { id: "6", label: "தமிழ்", color: "#9C88FF", code: "ta" },
+    { id: "7", label: "తెలుగు", color: "#8BC34A", code: "te" },
+    { id: "8", label: "ಕನ್ನಡ", color: "#00D2D3", code: "kn" },
+    { id: "9", label: "অসমীয়া", color: "#54A0FF", code: "as" },
+    { id: "10", label: "اردو", color: "#FFC048", code: "ur" },
+  ];
+
+  const handleLanguageSelect = (label) => {
+    const selected = languages.find((lang) => lang.label === label);
+    if (selected) {
+      i18n.changeLanguage(selected.code);
+    }
+    setLangModalVisible(false);
+  };
   const fetchProfile = async () => {
     try {
       const token = await AsyncStorage.getItem("userToken");
@@ -47,11 +73,11 @@ const ProfileScreen = () => {
         const data = await response.json();
         setProfile(data);
       } else {
-        Alert.alert("Error", "Failed to fetch profile data");
+        Alert.alert(t('common.error'), t('labourer.fetchProfileError'));
       }
     } catch (error) {
       console.error("Profile Fetch Error:", error);
-      Alert.alert("Network Error", "Unable to connect to server");
+      Alert.alert(t('auth.networkError'), t('labourer.unableToConnect'));
     } finally {
       setLoading(false);
     }
@@ -96,7 +122,7 @@ const ProfileScreen = () => {
           <Text style={styles.userName}>
             {params.name || profile?.user?.name}
           </Text>
-          <Text style={styles.userLocation}>Pune, Maharashtra</Text>
+          <Text style={styles.userLocation}>{t('profile.puneLocation')}</Text>
         </View>
 
         {/* Stats Row */}
@@ -105,24 +131,24 @@ const ProfileScreen = () => {
             <Text style={styles.statValue}>
               {profile?.rating?.toFixed(1) || "0.0"}
             </Text>
-            <Text style={styles.statLabel}>Rating</Text>
+            <Text style={styles.statLabel}>{t('profile.rating')}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{profile?.jobsDone || "0"}</Text>
-            <Text style={styles.statLabel}>Jobs Done</Text>
+            <Text style={styles.statLabel}>{t('profile.jobsDone')}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={styles.statValue}>
               {profile?.experience || "0"} Yr
             </Text>
-            <Text style={styles.statLabel}>Experience</Text>
+            <Text style={styles.statLabel}>{t('profile.experience')}</Text>
           </View>
         </View>
 
         {/* Services Section */}
-        <Text style={styles.sectionTitle}>Skills & Services</Text>
+        <Text style={styles.sectionTitle}>{t('profile.skillsAndServices')}</Text>
         <View style={styles.servicesContainer}>
           {skillsArray.length > 0 ? (
             skillsArray.map((skill, index) => (
@@ -131,19 +157,19 @@ const ProfileScreen = () => {
               </View>
             ))
           ) : (
-            <Text style={styles.noDataText}>No skills added yet</Text>
+            <Text style={styles.noDataText}>{t('profile.noSkillsAdded')}</Text>
           )}
           <TouchableOpacity
             style={styles.addServiceButton}
             onPress={handleAddSkills}
           >
-            <Text style={styles.addServiceText}>+Add</Text>
+            <Text style={styles.addServiceText}>{t('profile.add')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Earnings Section */}
         <View style={styles.earningCard}>
-          <Text style={styles.earningLabel}>Total Earnings</Text>
+          <Text style={styles.earningLabel}>{t('profile.totalEarnings')}</Text>
           <Text style={styles.earningValue}>
             ₹ {profile?.totalEarnings || "0"}
           </Text>
@@ -151,18 +177,27 @@ const ProfileScreen = () => {
 
         {/* Action Buttons */}
         <View style={styles.actionsContainer}>
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => setLangModalVisible(true)}>
             <Text style={styles.actionButtonText}>
-              Language: {profile?.language || "English"}
+              {t('profile.languageLabel', { language: profile?.language || 'English' })}
             </Text>
             <MaterialIcons name="translate" size={24} color="#000" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={handleLogout}>
-            <Text style={styles.actionButtonText}>Log out</Text>
+            <Text style={styles.actionButtonText}>{t('profile.logOut')}</Text>
             <Feather name="log-out" size={24} color="#e74c3c" />
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Language Selection Modal */}
+      <CategoryFilterModal
+        visible={langModalVisible}
+        onClose={() => setLangModalVisible(false)}
+        categories={languages}
+        onSelect={handleLanguageSelect}
+        title={t('languageSelection.title')}
+      />
     </View>
   );
 };

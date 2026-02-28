@@ -1,27 +1,39 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router"; // Import useRouter hook
+import { useRouter } from "expo-router";
 import { jwtDecode } from "jwt-decode";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  ActivityIndicator,
-  Alert,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    ImageBackground,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 const LoginScreen = () => {
-  const router = useRouter(); // Hook to handle navigation
+  const router = useRouter();
+  const { t } = useTranslation();
   const [phoneNo, setPhoneNo] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   console.log(`${process.env.EXPO_PUBLIC_FRONTEND_API_URL}`);
+
+  const handleSignup = () => {
+    router.push("/src/screens/CreateAccountScreen");
+  };
+
   const handleLogin = async () => {
     if (!phoneNo || !password) {
-      Alert.alert("Input Error", "Please enter phone number and password");
+      Alert.alert(t('auth.inputError'), t('auth.pleaseEnterPhoneAndPassword'));
       return;
     }
 
@@ -64,14 +76,14 @@ const LoginScreen = () => {
           // Navigates to the employer group
           router.replace("/(employer)/PostNewWorkScreen");
         } else {
-          Alert.alert("Role Error", "No valid role found in token");
+          Alert.alert(t('auth.roleError'), t('auth.noValidRole'));
         }
       } else {
-        Alert.alert("Login Failed", "Invalid credentials or Server error");
+        Alert.alert(t('auth.loginFailed'), t('auth.invalidCredentials'));
       }
     } catch (error) {
       console.error("Fetch Error:", error);
-      Alert.alert("Network Error", "Cannot connect to server. Check your IP.");
+      Alert.alert(t('auth.networkError'), t('auth.cannotConnectServer'));
     } finally {
       setLoading(false);
     }
@@ -79,73 +91,143 @@ const LoginScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome Back</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Phone Number"
-        keyboardType="phone-pad"
-        value={phoneNo}
-        onChangeText={setPhoneNo}
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle="dark-content"
       />
-
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
-
-      <TouchableOpacity
-        style={styles.button}
-        onPress={handleLogin}
-        disabled={loading}
+      <ImageBackground
+        source={require("../images/shram-bg.png")}
+        style={styles.background}
+        resizeMode="cover"
       >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Login</Text>
-        )}
-      </TouchableOpacity>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.keyboardView}
+        >
+          <ScrollView contentContainerStyle={styles.scrollContainer}>
+            <View style={styles.card}>
+              <Text style={styles.headerText}>{t('auth.welcomeBack')}</Text>
+
+              {/* Phone Input */}
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder={t('auth.phoneNumber')}
+                  placeholderTextColor="#666"
+                  keyboardType="phone-pad"
+                  value={phoneNo}
+                  onChangeText={setPhoneNo}
+                />
+              </View>
+
+              {/* Password Input */}
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder={t('auth.password')}
+                  placeholderTextColor="#666"
+                  secureTextEntry
+                  value={password}
+                  onChangeText={setPassword}
+                />
+              </View>
+
+              {/* Login Button */}
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={handleLogin}
+                disabled={loading}
+                activeOpacity={0.8}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>{t('auth.login')}</Text>
+                )}
+              </TouchableOpacity>
+
+              {/* Sign Up Link */}
+              <TouchableOpacity
+                style={styles.linkContainer}
+                onPress={handleSignup}
+              >
+                <Text style={styles.linkText}>
+                  {t('auth.dontHaveAccount')}
+                  <Text style={styles.linkHighlight}>{t('auth.signup')}</Text>
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </ImageBackground>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { flex: 1 },
+  background: { flex: 1, width: "100%", height: "100%" },
+  keyboardView: { flex: 1 },
+  scrollContainer: {
+    flexGrow: 1,
     justifyContent: "center",
     padding: 20,
-    backgroundColor: "#fff",
   },
-  title: {
-    fontSize: 32,
+  card: {
+    backgroundColor: "rgba(255, 255, 255, 0.9)", // Glassmorphism effect
+    borderRadius: 20,
+    padding: 25,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  headerText: {
+    fontSize: 28,
     fontWeight: "bold",
-    marginBottom: 40,
+    color: "#000",
+    marginBottom: 30,
     textAlign: "center",
-    color: "#FF9F43",
+  },
+  inputContainer: {
+    width: "100%",
+    marginBottom: 15,
   },
   input: {
+    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#ddd",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
+    borderColor: "#FF5E57", // Matches the red theme
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
     fontSize: 16,
+    color: "#333",
   },
-  button: {
-    backgroundColor: "#FF9F43",
-    padding: 15,
-    borderRadius: 10,
+  primaryButton: {
+    width: "100%",
+    backgroundColor: "#FF4757", // Distinct Red color
+    paddingVertical: 15,
+    borderRadius: 12,
     alignItems: "center",
     marginTop: 10,
+    elevation: 3,
+    shadowColor: "#FF4757",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
   },
   buttonText: {
     color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
   },
+  linkContainer: { marginTop: 20 },
+  linkText: { color: "#666", fontSize: 14 },
+  linkHighlight: { color: "#FF4757", fontWeight: "bold" },
 });
 
 export default LoginScreen;
+

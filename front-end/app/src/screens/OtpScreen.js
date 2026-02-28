@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
@@ -14,6 +15,7 @@ import {
 } from "react-native";
 
 const OtpScreen = () => {
+  const { t } = useTranslation();
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const inputRefs = useRef([]);
@@ -23,7 +25,7 @@ const OtpScreen = () => {
 
     // Basic Validation: Ensure 6 digits are entered
     if (code.length !== 6) {
-      Alert.alert("Error", "Please enter the full 6-digit code");
+      Alert.alert(t('common.error'), t('otp.enterFullCode'));
       return;
     }
 
@@ -65,7 +67,7 @@ const OtpScreen = () => {
   };
 
   const handleResend = () => {
-    Alert.alert("Resend OTP", "This is a demo. No code was sent.");
+    Alert.alert(t('otp.resendOtp'), t('otp.resendDemoMessage'));
   };
 
   return (
@@ -83,9 +85,9 @@ const OtpScreen = () => {
       >
         <View style={styles.contentContainer}>
           <View style={styles.card}>
-            <Text style={styles.headerText}>Enter OTP</Text>
+            <Text style={styles.headerText}>{t('otp.enterOtp')}</Text>
             <Text style={styles.subText}>
-              (Demo Mode) Enter any 6 digits to proceed
+              {t('otp.demoModeSubtext')}
             </Text>
 
             <View style={styles.otpContainer}>
@@ -111,7 +113,7 @@ const OtpScreen = () => {
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.buttonText}>Verify & Proceed</Text>
+                <Text style={styles.buttonText}>{t('otp.verifyAndProceed')}</Text>
               )}
             </TouchableOpacity>
 
@@ -120,8 +122,8 @@ const OtpScreen = () => {
               onPress={handleResend}
             >
               <Text style={styles.resendText}>
-                Didn't receive code?{" "}
-                <Text style={styles.resendHighlight}>Resend</Text>
+                {t('otp.didntReceiveCode')}
+                <Text style={styles.resendHighlight}>{t('otp.resend')}</Text>
               </Text>
             </TouchableOpacity>
           </View>

@@ -10,7 +10,10 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -23,12 +26,12 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.LabourLine.LabourLine",
       "googleServicesFile": "./google-services.json",
-
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyBr4B2M8dg7N7rhHmvJBK0uHyPazfLwMjg"
         }
-      }
+      },
+      "runtimeVersion": "1.0.0"
     },
     "web": {
       "output": "static",
@@ -39,7 +42,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "app/src/images/shram-bg.png",
+          "image": "app/src/images/logo.png",
           "imageWidth": 200,
           "resizeMode": "cover",
           "backgroundColor": "#FED8A8",
@@ -58,6 +61,9 @@
       "eas": {
         "projectId": "0a8b96dd-4938-4dc1-a248-38a24a5867a5"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/0a8b96dd-4938-4dc1-a248-38a24a5867a5"
     }
   }
 }

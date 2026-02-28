@@ -2,35 +2,40 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { jwtDecode } from "jwt-decode"; // Make sure to install: npm install jwt-decode
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  RefreshControl,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Modal,
+    RefreshControl,
+    SafeAreaView,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 
 // COMPONENTS
 import JobCard from "../../components/JobCard";
 import CategoryFilterModal from "../../components/RenderModal";
+import i18n from "../../i18n";
 import { filterData } from "../src/store/WorkData";
 import {
-  getCurrentAddress,
-  getUserCoordinates,
+    getCurrentAddress,
+    getUserCoordinates,
 } from "../src/store/locationUtils";
+import { translateJobs } from "../src/store/translateService";
 import { acceptWorkApi, getActiveWorkApi } from "../src/store/workService";
 
 const WorkScreen = () => {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [jobs, setJobs] = useState([]);
+  const [originalJobs, setOriginalJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilters, setActiveFilters] = useState({
@@ -95,6 +100,21 @@ const WorkScreen = () => {
     fetchJobs();
   }, []);
 
+  // Re-translate jobs when language changes
+  useEffect(() => {
+    const handleLanguageChange = async () => {
+      if (originalJobs.length > 0) {
+        const translated = await translateJobs(originalJobs);
+        setJobs(translated);
+      }
+    };
+
+    i18n.on("languageChanged", handleLanguageChange);
+    return () => {
+      i18n.off("languageChanged", handleLanguageChange);
+    };
+  }, [originalJobs]);
+
   // --- 2. API CALLS ---
   const fetchJobs = async (filtersToApply = {}) => {
     setLoading(true);
@@ -116,7 +136,10 @@ const WorkScreen = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setJobs(data);
+        setOriginalJobs(data);
+        // Translate job fields if language is not English
+        const translated = await translateJobs(data);
+        setJobs(translated);
       }
     } catch (error) {
       console.error(error);
@@ -140,7 +163,7 @@ const WorkScreen = () => {
       // Call the generalized API function
       const acceptedWorkData = await acceptWorkApi(workId);
 
-      Alert.alert("Success", "Work Accepted!");
+      Alert.alert(t('common.success'), t('labourer.workAccepted'));
 
       router.push({
         pathname: "/src/screens/WorkStatusScreen",
@@ -158,7 +181,7 @@ const WorkScreen = () => {
   // ACTION B: Submit Bid (New Logic)
   const submitBid = async () => {
     if (!bidAmount) {
-      Alert.alert("Error", "Please enter an amount");
+      Alert.alert(t('common.error'), t('labourer.pleaseEnterAmount'));
       return;
     }
 
@@ -188,17 +211,17 @@ const WorkScreen = () => {
       );
 
       if (response.ok) {
-        Alert.alert("Success", "Bid sent successfully!");
+        Alert.alert(t('common.success'), t('labourer.bidSent'));
         setBidModalVisible(false);
         setBidAmount("");
         setBidComment("");
       } else {
         const errText = await response.text();
-        Alert.alert("Error", errText || "Failed to place bid");
+        Alert.alert(t('common.error'), errText || t('labourer.failedToPlaceBid'));
       }
     } catch (error) {
       console.error(error);
-      Alert.alert("Error", "Network request failed");
+      Alert.alert(t('common.error'), t('labourer.networkRequestFailed'));
     } finally {
       setBidLoading(false);
     }
@@ -227,7 +250,7 @@ const WorkScreen = () => {
         setActiveFilters(newFilters);
         fetchJobs(newFilters);
       } else {
-        Alert.alert("Location Error", "Could not get your location.");
+        Alert.alert(t('labourer.locationError'), t('labourer.couldNotGetLocation'));
         setLoading(false);
       }
     } catch (error) {
@@ -255,14 +278,14 @@ const WorkScreen = () => {
         categories={currentOptions}
         onSelect={handleFilterSelection}
         onClose={() => setModalVisible(false)}
-        title="Select Distance"
+        title={t('labourer.selectDistance')}
       />
 
       {/* HEADER */}
       <View style={styles.headerContainer}>
         <View style={styles.headerTopRow}>
           <View>
-            <Text style={styles.headerTitle}>Select Work</Text>
+            <Text style={styles.headerTitle}>{t('labourer.selectWork')}</Text>
             <View style={styles.locationPill}>
               <Icon name="location-outline" size={16} color="#000" />
               <Text style={styles.locationText}>
@@ -287,7 +310,7 @@ const WorkScreen = () => {
           />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search Jobs..."
+            placeholder={t('labourer.searchJobs')}
             placeholderTextColor="#999"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -325,7 +348,7 @@ const WorkScreen = () => {
                 key={job.id}
                 job={job}
                 onAccept={() => handleAcceptWork(job.id)}
-                mainText={job.isBiddingAllowed ? "Bid Now" : "Accept"}
+                mainText={job.isBiddingAllowed ? t('labourer.bidNow') : t('labourer.accept')}
                 onPressAction={(job) => {
                   setSelectedJob(job);
                   setBidAmount(job.budget ? job.budget.toString() : "");
@@ -334,7 +357,7 @@ const WorkScreen = () => {
               />
             ))
           ) : (
-            <Text style={styles.noJobsText}>No jobs found at the moment.</Text>
+            <Text style={styles.noJobsText}>{t('labourer.noJobsFound')}</Text>
           )}
         </ScrollView>
       )}
@@ -348,25 +371,25 @@ const WorkScreen = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Place Your Bid</Text>
+            <Text style={styles.modalTitle}>{t('labourer.placeYourBid')}</Text>
             <Text style={styles.modalSubtitle}>
-              Budget: ₹{selectedJob?.budget || selectedJob?.earning || "N/A"}
+              {t('labourer.budgetLabel', { amount: selectedJob?.budget || selectedJob?.earning || 'N/A' })}
             </Text>
 
-            <Text style={styles.label}>Your Offer (₹)</Text>
+            <Text style={styles.label}>{t('labourer.yourOffer')}</Text>
             <TextInput
               style={styles.input}
               keyboardType="numeric"
-              placeholder="e.g. 600"
+              placeholder={t('labourer.offerPlaceholder')}
               value={bidAmount}
               onChangeText={setBidAmount}
             />
 
-            <Text style={styles.label}>Comment (Optional)</Text>
+            <Text style={styles.label}>{t('labourer.commentOptional')}</Text>
             <TextInput
               style={[styles.input, { height: 80, textAlignVertical: "top" }]}
               multiline
-              placeholder="I can do this job efficiently..."
+              placeholder={t('labourer.commentPlaceholder')}
               value={bidComment}
               onChangeText={setBidComment}
             />
@@ -376,7 +399,7 @@ const WorkScreen = () => {
                 style={[styles.btn, styles.btnCancel]}
                 onPress={() => setBidModalVisible(false)}
               >
-                <Text style={styles.btnTextCancel}>Cancel</Text>
+                <Text style={styles.btnTextCancel}>{t('common.cancel')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -387,7 +410,7 @@ const WorkScreen = () => {
                 {bidLoading ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                  <Text style={styles.btnTextSubmit}>Send Bid</Text>
+                  <Text style={styles.btnTextSubmit}>{t('labourer.sendBid')}</Text>
                 )}
               </TouchableOpacity>
             </View>

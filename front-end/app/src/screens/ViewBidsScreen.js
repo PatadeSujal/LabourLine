@@ -2,6 +2,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
@@ -16,6 +17,7 @@ import {
 import { acceptWorkApi, confirmBidApi } from "../store/workService";
 
 const ViewBidsScreen = () => {
+  const { t } = useTranslation();
   const { workId } = useLocalSearchParams(); // Get Work ID from navigation
   const [bids, setBids] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +38,7 @@ const ViewBidsScreen = () => {
       const data = await response.json();
       setBids(data);
     } catch (error) {
-      Alert.alert("Error", "Failed to load bids");
+      Alert.alert(t('common.error'), t('employer.failedToLoadBids'));
     } finally {
       setLoading(false);
     }
@@ -47,12 +49,12 @@ const ViewBidsScreen = () => {
   const handleConfirmBid = async (bidId, amount) => {
     console.log("Called ");
     Alert.alert(
-      "Confirm Worker",
-      `Are you sure you want to hire this worker for ₹${amount}?`,
+      t('employer.confirmWorker'),
+      t('employer.confirmWorkerMessage', { amount }),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t('common.cancel'), style: "cancel" },
         {
-          text: "Hire",
+          text: t('employer.hire'),
           onPress: async () => {
             setLoading(true);
             try {
@@ -71,7 +73,7 @@ const ViewBidsScreen = () => {
               );
 
               // 4. SUCCESS NAVIGATION
-              Alert.alert("Success", "Worker hired! Job is now in progress.");
+              Alert.alert(t('common.success'), t('employer.workerHired'));
               router.replace({
                 pathname: "/src/screens/EmployerWorkStatusScreen",
                 params: {
@@ -79,7 +81,7 @@ const ViewBidsScreen = () => {
                 },
               });
             } catch (error) {
-              Alert.alert("Error", error.message || "Failed to hire worker.");
+              Alert.alert(t('common.error'), error.message || t('employer.failedToHire'));
             } finally {
               setLoading(false);
             }
@@ -98,9 +100,9 @@ const ViewBidsScreen = () => {
         <View style={styles.row}>
           <View>
             <Text style={styles.workerName}>
-              {item.workerName || "Unknown Worker"}
+              {item.workerName || t('employer.unknownWorker')}
             </Text>
-            <Text style={styles.comment}>"{item.comment || "No comment"}"</Text>
+            <Text style={styles.comment}>"{item.comment || t('employer.noComment')}"</Text>
           </View>
           <Text style={styles.price}>₹{item.bidAmount}</Text>
         </View>
@@ -110,7 +112,7 @@ const ViewBidsScreen = () => {
           // UPDATED: Pass item.workerId instead of item.labourId
           onPress={() => handleConfirmBid(item.id, item.bidAmount)}
         >
-          <Text style={styles.btnText}>Confirm Job</Text>
+          <Text style={styles.btnText}>{t('employer.confirmJob')}</Text>
           <MaterialIcons
             name="check-circle"
             size={20}
@@ -129,7 +131,7 @@ const ViewBidsScreen = () => {
         <TouchableOpacity onPress={() => router.back()} style={{ padding: 10 }}>
           <MaterialIcons name="arrow-back" size={24} color="#0D47A1" />
         </TouchableOpacity>
-        <Text style={styles.title}>Received Bids</Text>
+        <Text style={styles.title}>{t('employer.receivedBids')}</Text>
       </View>
 
       {loading ? (
@@ -145,7 +147,7 @@ const ViewBidsScreen = () => {
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={{ padding: 20 }}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>No bids received yet.</Text>
+            <Text style={styles.emptyText}>{t('employer.noBidsYet')}</Text>
           }
         />
       )}

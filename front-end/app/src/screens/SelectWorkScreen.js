@@ -2,20 +2,22 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { jwtDecode } from "jwt-decode";
 import { useState } from "react"; // Removed useEffect
+import { useTranslation } from "react-i18next";
 import {
-  ActivityIndicator,
-  Alert,
-  ImageBackground,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    ImageBackground,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 
 const SelectWorkScreen = () => {
+  const { t } = useTranslation();
   const params = useLocalSearchParams();
 
   // --- FIX START: Initialize State Directly (Lazy Initialization) ---
@@ -67,7 +69,7 @@ const SelectWorkScreen = () => {
     try {
       const token = await AsyncStorage.getItem("userToken");
       if (!token) {
-        Alert.alert("Error", "User not authenticated. Please login again.");
+        Alert.alert(t('common.error'), t('selectWork.userNotAuthenticated'));
         setIsLoading(false);
         return;
       }
@@ -77,7 +79,7 @@ const SelectWorkScreen = () => {
       const labourId = decoded.id || decoded.userId;
 
       if (!labourId) {
-        Alert.alert("Error", "Invalid Token: ID not found.");
+        Alert.alert(t('common.error'), t('selectWork.invalidToken'));
         setIsLoading(false);
         return;
       }
@@ -107,11 +109,11 @@ const SelectWorkScreen = () => {
         router.replace("/(worker)/WorkScreen");
       } else {
         const errorText = await response.text();
-        Alert.alert("Update Failed", errorText || "Could not update skills");
+        Alert.alert(t('selectWork.updateFailed'), errorText || t('selectWork.couldNotUpdateSkills'));
       }
     } catch (error) {
       console.error("Network request failed:", error);
-      Alert.alert("Error", "Network request failed. Check your connection.");
+      Alert.alert(t('common.error'), t('selectWork.networkRequestFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -164,7 +166,7 @@ const SelectWorkScreen = () => {
               })
             ) : (
               <Text style={{ color: "#666", fontSize: 16 }}>
-                No sub-categories found.
+                {t('selectWork.noSubCategories')}
               </Text>
             )}
           </View>
@@ -187,7 +189,7 @@ const SelectWorkScreen = () => {
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <>
-                <Text style={styles.nextButtonText}>Next</Text>
+                <Text style={styles.nextButtonText}>{t('common.next')}</Text>
                 <Icon name="arrow-forward" size={24} color="#fff" />
               </>
             )}

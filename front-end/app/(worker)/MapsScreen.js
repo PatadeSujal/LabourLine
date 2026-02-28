@@ -14,6 +14,7 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import JobCard from "../../components/JobCard";
 import { getUserCoordinates } from "../src/store/locationUtils";
 import { acceptWorkApi } from "../src/store/workService";
+import { useTranslation } from "react-i18next";
 
 const { width, height } = Dimensions.get("window");
 
@@ -93,6 +94,7 @@ const mapStyle = [
 ];
 
 const MapsScreen = () => {
+  const { t } = useTranslation();
   const [userLocation, setUserLocation] = useState(null);
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [jobs, setJobs] = useState([]); // State for API data
@@ -150,7 +152,7 @@ const MapsScreen = () => {
       // Call the generalized API function
       const acceptedWorkData = await acceptWorkApi(workId);
 
-      Alert.alert("Success", "Work Accepted!");
+      Alert.alert(t('common.success'), t('labourer.workAccepted'));
 
       // Navigate using the returned data
       router.push({
@@ -191,7 +193,7 @@ const MapsScreen = () => {
         {userLocation && (
           <Marker
             coordinate={userLocation}
-            title="You are here"
+            title={t('labourer.youAreHere')}
             pinColor="#007AFF"
           />
         )}

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   FlatList,
   Modal,
@@ -8,7 +9,8 @@ import {
 } from "react-native";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
-const CategoryFilterModal = ({ visible, onClose, categories, onSelect }) => {
+const CategoryFilterModal = ({ visible, onClose, categories, onSelect, title }) => {
+  const { t } = useTranslation();
   return (
     <Modal
       animationType="slide"
@@ -20,7 +22,7 @@ const CategoryFilterModal = ({ visible, onClose, categories, onSelect }) => {
         <View style={styles.modalContent}>
           {/* FIXED: Changed <div> to <View> */}
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Category</Text>
+            <Text style={styles.modalTitle}>{title || t('modal.selectCategory')}</Text>
             <TouchableOpacity onPress={onClose}>
               <MaterialIcons name="close" size={24} color="#333" />
             </TouchableOpacity>

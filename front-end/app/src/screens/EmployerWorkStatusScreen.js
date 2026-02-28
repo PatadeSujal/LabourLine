@@ -2,21 +2,23 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { CheckCircle, MapPin, Phone, User, X } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  ActivityIndicator,
-  Alert,
-  Linking,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Linking,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 
 const EmployerWorkStatusScreen = () => {
   const params = useLocalSearchParams();
+  const { t } = useTranslation();
   const [workData, setWorkData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [labourLocation, setLabourLocation] = useState(null);
@@ -162,7 +164,7 @@ const EmployerWorkStatusScreen = () => {
     if (workData?.labour?.phoneNo) {
       Linking.openURL(`tel:${workData.labour.phoneNo}`);
     } else {
-      Alert.alert("Info", "Phone number not available.");
+      Alert.alert(t("common.info"), t("employer.phoneNotAvailable"));
     }
   };
 
@@ -170,12 +172,14 @@ const EmployerWorkStatusScreen = () => {
     if (!workData?.work || workData.status === "COMPLETED") return;
 
     Alert.alert(
-      "Confirm Completion",
-      `Are you sure you want to complete this work and release ₹${workData.work.budget || workData.work.earning}?`,
+      t("employer.confirmCompletionTitle"),
+      t("employer.confirmCompletionMessage", {
+        amount: workData.work.budget || workData.work.earning,
+      }),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Yes, Complete",
+          text: t("employer.yesComplete"),
           style: "default",
           onPress: async () => {
             try {
@@ -194,7 +198,10 @@ const EmployerWorkStatusScreen = () => {
               );
 
               if (response.ok) {
-                Alert.alert("Success", "Work Marked as Completed!");
+                Alert.alert(
+                  t("common.success"),
+                  t("employer.workMarkedCompleted"),
+                );
                 setWorkData((prev) => ({
                   ...prev,
                   status: "COMPLETED",
@@ -202,10 +209,13 @@ const EmployerWorkStatusScreen = () => {
                 }));
               } else {
                 const errorText = await response.text();
-                Alert.alert("Error", errorText || "Failed to update status.");
+                Alert.alert(
+                  t("common.error"),
+                  errorText || t("employer.failedToUpdate"),
+                );
               }
             } catch (e) {
-              Alert.alert("Error", "Network error occurred.");
+              Alert.alert(t("common.error"), t("common.networkError"));
             }
           },
         },
@@ -217,7 +227,7 @@ const EmployerWorkStatusScreen = () => {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#1B1464" />
-        <Text style={styles.loadingText}>Loading Details...</Text>
+        <Text style={styles.loadingText}>{t("common.loadingDetails")}</Text>
       </View>
     );
   }
@@ -225,9 +235,13 @@ const EmployerWorkStatusScreen = () => {
   if (!workData || !workData.work) {
     return (
       <View style={styles.centerContainer}>
-        <Text style={{ color: "#666", marginBottom: 20 }}>No Data Found</Text>
+        <Text style={{ color: "#666", marginBottom: 20 }}>
+          {t("common.noDataFound")}
+        </Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={{ color: "#fff", fontWeight: "bold" }}>Go Back</Text>
+          <Text style={{ color: "#fff", fontWeight: "bold" }}>
+            {t("common.goBack")}
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -305,7 +319,7 @@ const EmployerWorkStatusScreen = () => {
               <View style={styles.mapPlaceholder}>
                 <MapPin size={40} color="#ccc" />
                 <Text style={{ marginTop: 10, color: "#999" }}>
-                  Location not provided
+                  {t("employer.locationNotProvided")}
                 </Text>
               </View>
             )}
@@ -320,12 +334,12 @@ const EmployerWorkStatusScreen = () => {
             </View>
             <View style={styles.textContainer}>
               <Text style={styles.jobTitle}>
-                {labour.name || "Assigned Worker"}
+                {labour.name || t("employer.assignedWorker")}
               </Text>
               <Text style={styles.subText}>
                 {labour.phoneNo
                   ? `Phone: ${labour.phoneNo}`
-                  : "Contact details hidden"}
+                  : t("employer.contactHidden")}
               </Text>
             </View>
             {labour.phoneNo && (
@@ -343,8 +357,12 @@ const EmployerWorkStatusScreen = () => {
           {/* OTP Section */}
           <View style={styles.otpRow}>
             <View>
-              <Text style={styles.otpLabel}>Start Code</Text>
-              <Text style={styles.otpDesc}>Share with labour</Text>
+              <Text style={styles.otpLabel}>
+                {t("employer.startCodeTitle")}
+              </Text>
+              <Text style={styles.otpDesc}>
+                {t("employer.shareWithLabour")}
+              </Text>
             </View>
             <View style={styles.otpBox}>
               <Text style={styles.otpText}>
@@ -356,13 +374,13 @@ const EmployerWorkStatusScreen = () => {
 
         {/* Job Details Card */}
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Job Details</Text>
+          <Text style={styles.sectionTitle}>{t("employer.jobDetails")}</Text>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Title</Text>
+            <Text style={styles.detailLabel}>{t("employer.jobTitle")}</Text>
             <Text style={styles.detailValue}>{work.title}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Amount</Text>
+            <Text style={styles.detailLabel}>{t("employer.budgetAmount")}</Text>
             <Text style={[styles.detailValue, { color: "#2ecc71" }]}>
               ₹ {work.bids?.[0]?.bidAmount || work.budget || work.earning}
             </Text>
@@ -374,7 +392,9 @@ const EmployerWorkStatusScreen = () => {
           {isCompleted ? (
             <View style={styles.completedBanner}>
               <CheckCircle size={24} color="#FFF" style={{ marginRight: 10 }} />
-              <Text style={styles.completeBtnText}>Work Completed</Text>
+              <Text style={styles.completeBtnText}>
+                {t("employer.workCompletedBanner")}
+              </Text>
             </View>
           ) : (
             <TouchableOpacity
@@ -382,7 +402,9 @@ const EmployerWorkStatusScreen = () => {
               onPress={handleMarkCompleted}
             >
               <CheckCircle size={24} color="#FFF" style={{ marginRight: 10 }} />
-              <Text style={styles.completeBtnText}>Mark Completed</Text>
+              <Text style={styles.completeBtnText}>
+                {t("employer.markCompleted")}
+              </Text>
             </TouchableOpacity>
           )}
         </View>

@@ -6,6 +6,7 @@ import * as Location from "expo-location";
 import { router } from "expo-router";
 import { jwtDecode } from "jwt-decode";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
@@ -28,6 +29,7 @@ import {
 } from "../src/store/locationUtils";
 
 const PostNewWorkScreen = () => {
+  const { t } = useTranslation();
   // --- FORM STATE ---
   const [jobTitle, setJobTitle] = useState("");
   const [category, setCategory] = useState("");
@@ -66,7 +68,7 @@ const PostNewWorkScreen = () => {
         setRecording(recording);
         setIsRecording(true);
       } else {
-        Alert.alert("Permission to access microphone is required!");
+        Alert.alert(t('employer.micPermission'));
       }
     } catch (err) {
       console.error("Failed to start recording", err);
@@ -86,13 +88,13 @@ const PostNewWorkScreen = () => {
   }
 
   const pickImage = async () => {
-    Alert.alert("Upload Image", "Choose an option", [
+    Alert.alert(t('employer.uploadImage'), t('employer.chooseOption'), [
       {
-        text: "Camera",
+        text: t('employer.camera'),
         onPress: async () => {
           const permission = await ImagePicker.requestCameraPermissionsAsync();
           if (permission.status !== "granted")
-            return Alert.alert("Permission denied");
+            return Alert.alert(t('common.permissionDenied'));
           const result = await ImagePicker.launchCameraAsync({
             allowsEditing: true,
             aspect: [4, 3],
@@ -102,7 +104,7 @@ const PostNewWorkScreen = () => {
         },
       },
       {
-        text: "Gallery",
+        text: t('employer.gallery'),
         onPress: async () => {
           const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -113,7 +115,7 @@ const PostNewWorkScreen = () => {
           if (!result.canceled) setImage(result.assets[0].uri);
         },
       },
-      { text: "Cancel", style: "cancel" },
+      { text: t('common.cancel'), style: "cancel" },
     ]);
   };
 
@@ -138,7 +140,7 @@ const PostNewWorkScreen = () => {
       }
     } catch (error) {
       console.error("Location handling error:", error);
-      Alert.alert("Error", "Could not complete location detection.");
+      Alert.alert(t('common.error'), t('employer.couldNotCompleteLocation'));
     } finally {
       setIsLocating(false);
     }
@@ -153,12 +155,12 @@ const PostNewWorkScreen = () => {
   // --- SUBMIT FUNCTION ---
   const handlePostWork = async () => {
     if (!jobTitle || !amount || !category) {
-      Alert.alert("Error", "Please fill in Job Title, Category, and Amount.");
+      Alert.alert(t('common.error'), t('employer.fillRequiredFields'));
       return;
     }
 
     if (locationMode === "manual" && !address.trim()) {
-      Alert.alert("Error", "Please enter a valid address.");
+      Alert.alert(t('common.error'), t('employer.enterValidAddress'));
       return;
     }
 
@@ -179,7 +181,7 @@ const PostNewWorkScreen = () => {
             finalLng = geocodedLocation[0].longitude;
           } else {
             setLoading(false);
-            Alert.alert("Location Error", "Could not find coordinates.");
+            Alert.alert(t('employer.locationError'), t('employer.couldNotFindCoords'));
             return;
           }
         } catch (e) {
@@ -258,16 +260,16 @@ const PostNewWorkScreen = () => {
       );
 
       if (response.ok) {
-        Alert.alert("Success", "Work posted successfully!", [
-          { text: "OK", onPress: () => router.replace("YouPostedScreen") },
+        Alert.alert(t('common.success'), t('employer.workPosted'), [
+          { text: t('common.ok'), onPress: () => router.replace("YouPostedScreen") },
         ]);
       } else {
         const err = await response.text();
-        Alert.alert("Error", "Server Error: " + err);
+        Alert.alert(t('common.error'), t('employer.serverError') + err);
       }
     } catch (error) {
       console.error(error);
-      Alert.alert("Network Error", "Could not connect to the server.");
+      Alert.alert(t('auth.networkError'), t('employer.couldNotConnect'));
     } finally {
       setLoading(false);
     }
@@ -290,8 +292,8 @@ const PostNewWorkScreen = () => {
       >
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerTitle}>Post New Work</Text>
-            <Text style={styles.headerSubtitle}>Hire Skill in Seconds</Text>
+            <Text style={styles.headerTitle}>{t('employer.postNewWork')}</Text>
+            <Text style={styles.headerSubtitle}>{t('employer.hireSkillInSeconds')}</Text>
           </View>
           <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
             <MaterialIcons name="logout" size={24} color="#fff" />
@@ -301,7 +303,7 @@ const PostNewWorkScreen = () => {
         <View style={styles.formBody}>
           {/* 1. JOB TITLE */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>JOB TITLE</Text>
+            <Text style={styles.label}>{t('employer.jobTitleLabel')}</Text>
             <View style={styles.inputWrapper}>
               <MaterialIcons
                 name="work"
@@ -311,7 +313,7 @@ const PostNewWorkScreen = () => {
               />
               <TextInput
                 style={styles.input}
-                placeholder="e.g Help with moving"
+                placeholder={t('employer.jobTitlePlaceholder')}
                 value={jobTitle}
                 onChangeText={setJobTitle}
               />
@@ -320,7 +322,7 @@ const PostNewWorkScreen = () => {
 
           {/* 2. CATEGORY */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>CATEGORY</Text>
+            <Text style={styles.label}>{t('employer.categoryLabel')}</Text>
             <TouchableOpacity
               style={styles.dropdown}
               onPress={() => setModalVisible(true)}
@@ -334,7 +336,7 @@ const PostNewWorkScreen = () => {
               <Text
                 style={[styles.dropdownText, !category && { color: "#999" }]}
               >
-                {category || "Select"}
+                {category || t('common.select')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -343,7 +345,7 @@ const PostNewWorkScreen = () => {
           {/* 3. SIMPLIFIED PRICING SECTION */}
           <View style={styles.pricingWrapper}>
             <View style={styles.switchRow}>
-              <Text style={styles.label}>PRICING MODEL</Text>
+              <Text style={styles.label}>{t('employer.pricingModel')}</Text>
 
               {/* TOGGLE CONTAINER */}
               <View style={styles.switchContainer}>
@@ -355,7 +357,7 @@ const PostNewWorkScreen = () => {
                       !allowBidding && styles.activeSwitchText,
                     ]}
                   >
-                    Fixed Price
+                    {t('employer.fixedPrice')}
                   </Text>
                 </TouchableOpacity>
 
@@ -377,14 +379,14 @@ const PostNewWorkScreen = () => {
                       allowBidding && styles.activeSwitchText,
                     ]}
                   >
-                    Allow Bidding
+                    {t('employer.allowBidding')}
                   </Text>
                 </TouchableOpacity>
               </View>
             </View>
 
             <Text style={[styles.label, { marginTop: 15 }]}>
-              {allowBidding ? "ESTIMATED BUDGET / OPENING BID" : "FIXED AMOUNT"}
+              {allowBidding ? t('employer.estimatedBudget') : t('employer.fixedAmount')}
             </Text>
 
             <View style={styles.amountContainer}>
@@ -397,7 +399,7 @@ const PostNewWorkScreen = () => {
               <TextInput
                 style={styles.amountInput}
                 placeholder={
-                  allowBidding ? "e.g. 500 (Start)" : "e.g. 500 (Exact)"
+                  allowBidding ? t('employer.biddingPlaceholder') : t('employer.fixedPlaceholder')
                 }
                 keyboardType="numeric"
                 value={amount}
@@ -407,8 +409,8 @@ const PostNewWorkScreen = () => {
 
             <Text style={styles.helperText}>
               {allowBidding
-                ? "Workers can send offers. You choose the best price."
-                : "Workers can only accept this exact amount. Good for urgent jobs."}
+                ? t('employer.biddingHelperText')
+                : t('employer.fixedHelperText')}
             </Text>
           </View>
 
@@ -430,7 +432,7 @@ const PostNewWorkScreen = () => {
               <Text
                 style={[styles.mediaText, isRecording && { color: "white" }]}
               >
-                {isRecording ? "Stop" : audioUri ? "Recorded" : "Add Voice"}
+                {isRecording ? t('employer.stop') : audioUri ? t('employer.recorded') : t('employer.addVoice')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -439,7 +441,7 @@ const PostNewWorkScreen = () => {
             >
               <MaterialIcons name="camera-alt" size={24} color="#0D47A1" />
               <Text style={styles.mediaText}>
-                {image ? "Image Added" : "Add Photo"}
+                {image ? t('employer.imageAdded') : t('employer.addPhoto')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -458,7 +460,7 @@ const PostNewWorkScreen = () => {
 
           {/* 6. LOCATION SECTION */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>WORK LOCATION</Text>
+            <Text style={styles.label}>{t('employer.workLocationLabel')}</Text>
             <View style={styles.locationToggle}>
               <TouchableOpacity
                 style={[
@@ -473,7 +475,7 @@ const PostNewWorkScreen = () => {
                     locationMode === "current" && styles.toggleTextActive,
                   ]}
                 >
-                  Current
+                  {t('employer.current')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -489,7 +491,7 @@ const PostNewWorkScreen = () => {
                     locationMode === "manual" && styles.toggleTextActive,
                   ]}
                 >
-                  Manual
+                  {t('employer.manual')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -506,7 +508,7 @@ const PostNewWorkScreen = () => {
                   ) : (
                     <MaterialIcons name="my-location" size={20} color="#fff" />
                   )}
-                  <Text style={styles.detectButtonText}>Detect Location</Text>
+                  <Text style={styles.detectButtonText}>{t('employer.detectLocation')}</Text>
                 </TouchableOpacity>
                 {address ? (
                   <Text style={styles.detectedAddress}>{address}</Text>
@@ -522,7 +524,7 @@ const PostNewWorkScreen = () => {
                 />
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter full address"
+                  placeholder={t('employer.enterFullAddress')}
                   value={address}
                   onChangeText={setAddress}
                   multiline
@@ -549,8 +551,8 @@ const PostNewWorkScreen = () => {
                 />
                 <Text style={styles.submitButtonText}>
                   {allowBidding
-                    ? "Post & Wait for Bids"
-                    : "Post Fixed Price Job"}
+                    ? t('employer.postAndWaitForBids')
+                    : t('employer.postFixedPriceJob')}
                 </Text>
               </>
             )}

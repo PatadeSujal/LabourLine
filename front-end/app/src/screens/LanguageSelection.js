@@ -1,6 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import { jwtDecode } from "jwt-decode";
+import { useTranslation } from "react-i18next";
 import {
   Dimensions,
   ImageBackground,
@@ -10,11 +9,28 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import i18n from "../../../i18n";
 const { width } = Dimensions.get("window");
 
 
 
 const LanguageSelectionScreen = () => {
+  const { t } = useTranslation();
+
+  // Map language labels to i18n language codes
+  const languageCodeMap = {
+    "हिंदी": "hi",
+    "मराठी": "mr",
+    "മലయാളം": "ml",
+    "ਪੰਜਾਬੀ": "pa",
+    "தமிழ்": "ta",
+    "తెలుగు": "te",
+    "اردو": "ur",
+    "ಕನ್ನಡ": "kn",
+    "অসমীয়া": "as",
+    "English": "en",
+  };
+
   const languages = [
     { id: "1", label: "हिंदी", color: "#FF5E57" }, // Red/Coral
     { id: "2", label: "मराठी", color: "#FF9F43" }, // Orange
@@ -29,6 +45,10 @@ const LanguageSelectionScreen = () => {
   ];
 
   const handleLanguageSelect = (language) => {
+    const langCode = languageCodeMap[language.label];
+    if (langCode) {
+      i18n.changeLanguage(langCode);
+    }
     console.log(`Selected Language: ${language.label}`);
     router.push("/src/screens/CreateAccountScreen");
   };
@@ -51,7 +71,7 @@ const LanguageSelectionScreen = () => {
         <View style={styles.contentContainer}>
           {/* Header Title */}
           <Text style={styles.headerText}>
-            Language / <Text style={styles.hindiHeader}>भाषा</Text>
+            {t('languageSelection.headerTitle')}<Text style={styles.hindiHeader}>{t('languageSelection.headerHindi')}</Text>
           </Text>
 
           {/* Grid of Language Buttons */}

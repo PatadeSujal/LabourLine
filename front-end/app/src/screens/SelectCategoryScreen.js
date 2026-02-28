@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useTranslation } from "react-i18next";
 import {
   ImageBackground,
   ScrollView,
@@ -13,6 +14,7 @@ import {
 import { workCategories } from "../../src/store/WorkData";
 
 const SelectCategoryScreen = () => {
+  const { t } = useTranslation();
   const handleCategorySelect = (category) => {
     // 2. PASS DATA TO NEXT SCREEN
     // We pass the specific subCategories for the clicked item
@@ -40,8 +42,8 @@ const SelectCategoryScreen = () => {
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.headerContainer}>
-            <Text style={styles.headerText}>Select Work</Text>
-            <Text style={styles.headerText}>Category</Text>
+            <Text style={styles.headerText}>{t('selectCategory.selectWork')}</Text>
+            <Text style={styles.headerText}>{t('selectCategory.category')}</Text>
           </View>
 
           <View style={styles.listContainer}>

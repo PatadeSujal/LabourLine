@@ -3,9 +3,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Tabs, useRouter, useSegments } from "expo-router";
 import { jwtDecode } from "jwt-decode";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, View } from "react-native";
 
 export default function TabLayout() {
+  const { t } = useTranslation();
   const router = useRouter();
   const segments = useSegments(); // To check current route
   const [isLoading, setIsLoading] = useState(true);
@@ -68,7 +70,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="WorkScreen"
         options={{
-          title: "Find Work",
+          title: t('tabs.findWork'),
           tabBarIcon: ({ color }) => (
             <MaterialIcons name="work" size={24} color={color} />
           ),
@@ -77,7 +79,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="MapsScreen"
         options={{
-          title: "Map",
+          title: t('tabs.map'),
           tabBarIcon: ({ color }) => (
             <MaterialIcons name="map" size={24} color={color} />
           ),
@@ -86,7 +88,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="ProfileScreen"
         options={{
-          title: "Profile",
+          title: t('tabs.profile'),
           tabBarIcon: ({ color }) => (
             <MaterialIcons name="person" size={24} color={color} />
           ),

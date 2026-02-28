@@ -3,20 +3,22 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { jwtDecode } from "jwt-decode";
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  ActivityIndicator,
-  Alert,
-  RefreshControl,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Alert,
+    RefreshControl,
+    SafeAreaView,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 import JobCard from "../../components/JobCard";
 
 const YouPostedScreen = () => {
+  const { t } = useTranslation();
   const [postedJobs, setPostedJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -25,7 +27,7 @@ const YouPostedScreen = () => {
     try {
       const token = await AsyncStorage.getItem("userToken");
       if (!token) {
-        Alert.alert("Error", "Authentication token missing.");
+        Alert.alert(t('common.error'), t('employer.authTokenMissing'));
         return;
       }
 
@@ -71,11 +73,11 @@ const YouPostedScreen = () => {
         setPostedJobs(mappedJobs);
       } else {
         // console.error("API Error:", await response.text());
-        Alert.alert("Error", "Failed to load your posted jobs.");
+        Alert.alert(t('common.error'), t('employer.failedToLoadPosts'));
       }
     } catch (error) {
       console.error("Fetch Posted Jobs Error:", error);
-      Alert.alert("Connection Error", "Could not reach the server.");
+      Alert.alert(t('employer.connectionError'), t('employer.couldNotReachServer'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -121,17 +123,17 @@ const YouPostedScreen = () => {
       <StatusBar barStyle="light-content" backgroundColor="#0D47A1" />
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>You Posted</Text>
+        <Text style={styles.headerTitle}>{t('employer.dashboardTitle')}</Text>
         <View style={styles.locationContainer}>
           <MaterialIcons name="location-on" size={16} color="#fff" />
-          <Text style={styles.locationText}>Pune, Maharashtra</Text>
+          <Text style={styles.locationText}>{t('employer.puneLocation')}</Text>
         </View>
       </View>
 
       {loading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#FF9F43" />
-          <Text style={styles.loaderText}>Getting your posts...</Text>
+          <Text style={styles.loaderText}>{t('employer.gettingPosts')}</Text>
         </View>
       ) : (
         <ScrollView
@@ -148,7 +150,7 @@ const YouPostedScreen = () => {
                 job={item}
                 // 1. DYNAMIC BUTTON TEXT
                 // If bidding is allowed, show "View Bids", else "View Status"
-                mainText={item.isBiddingAllowed ? "View Bids" : "View Status"}
+                mainText={item.isBiddingAllowed ? t('employer.viewBids') : t('employer.viewStatus')}
                 // 2. ACTION HANDLERS
                 // JobCard calls 'onPressAction' if isBiddingAllowed is true
                 onPressAction={() => handleViewStatus(item)}
@@ -159,7 +161,7 @@ const YouPostedScreen = () => {
           ) : (
             <View style={styles.emptyContainer}>
               <MaterialIcons name="work-outline" size={64} color="#ccc" />
-              <Text style={styles.emptyText}>No active job posts found.</Text>
+              <Text style={styles.emptyText}>{t('employer.noActivePosts')}</Text>
             </View>
           )}
         </ScrollView>

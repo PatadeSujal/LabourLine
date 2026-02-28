@@ -1,5 +1,6 @@
 import { router } from "expo-router";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ImageBackground,
   KeyboardAvoidingView,
@@ -13,6 +14,7 @@ import {
   View,
 } from "react-native";
 const CreateAccountScreen = () => {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [phone, setPhone] = useState("");
@@ -49,12 +51,12 @@ const CreateAccountScreen = () => {
         >
           <ScrollView contentContainerStyle={styles.scrollContainer}>
             <View style={styles.card}>
-              <Text style={styles.headerText}>Create Account</Text>
+              <Text style={styles.headerText}>{t('auth.createAccount')}</Text>
               {/* Name Input */}
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter Your Name"
+                  placeholder={t('auth.enterName')}
                   placeholderTextColor="#666"
                   value={name}
                   onChangeText={setName}
@@ -64,7 +66,7 @@ const CreateAccountScreen = () => {
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter Your Age"
+                  placeholder={t('auth.enterAge')}
                   placeholderTextColor="#666"
                   value={age}
                   onChangeText={setAge}
@@ -76,7 +78,7 @@ const CreateAccountScreen = () => {
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter Phone No"
+                  placeholder={t('auth.enterPhone')}
                   placeholderTextColor="#666"
                   value={phone}
                   onChangeText={setPhone}
@@ -87,7 +89,7 @@ const CreateAccountScreen = () => {
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter Password"
+                  placeholder={t('auth.enterPassword')}
                   placeholderTextColor="#666"
                   value={password}
                   onChangeText={setPassword}
@@ -101,7 +103,7 @@ const CreateAccountScreen = () => {
                 style={styles.primaryButton}
                 activeOpacity={0.8}
               >
-                <Text style={styles.buttonText}>Create Account</Text>
+                <Text style={styles.buttonText}>{t('auth.createAccount')}</Text>
               </TouchableOpacity>
               {/* Login Link */}
               <TouchableOpacity
@@ -109,8 +111,8 @@ const CreateAccountScreen = () => {
                 onPress={handleLogin}
               >
                 <Text style={styles.linkText}>
-                  Already have an account?
-                  <Text style={styles.linkHighlight}>Login</Text>
+                  {t('auth.alreadyHaveAccount')}
+                  <Text style={styles.linkHighlight}>{t('auth.login')}</Text>
                 </Text>
               </TouchableOpacity>
             </View>

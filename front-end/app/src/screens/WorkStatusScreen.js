@@ -4,22 +4,24 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { jwtDecode } from "jwt-decode";
 import { CheckCircle, MapPin, Navigation, Phone } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  ActivityIndicator,
-  Alert,
-  BackHandler,
-  Linking,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    BackHandler,
+    Linking,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import { calculateDistance } from "../store/locationUtils";
 
 const WorkStatusScreen = () => {
+  const { t } = useTranslation();
   const params = useLocalSearchParams();
   const [workData, setWorkData] = useState(null);
   const [myLocation, setMyLocation] = useState(null);
@@ -78,11 +80,11 @@ const WorkStatusScreen = () => {
           if (currentStatus === "COMPLETED") {
             setIsCompleted(true);
             Alert.alert(
-              "Job Completed!",
-              "The employer has confirmed the work. You can now return to the dashboard.",
+              t('labourer.jobCompletedAlertTitle'),
+              t('labourer.jobCompletedAlertMessage'),
               [
                 {
-                  text: "OK",
+                  text: t('common.ok'),
                   onPress: () => router.replace("/(worker)/WorkScreen"),
                 },
               ],
@@ -106,7 +108,7 @@ const WorkStatusScreen = () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
         if (isMounted)
-          Alert.alert("Permission denied", "Allow location to navigate.");
+          Alert.alert(t('common.permissionDenied'), t('common.allowLocation'));
         return;
       }
 
@@ -190,8 +192,8 @@ const WorkStatusScreen = () => {
       const onBackPress = () => {
         if (isCompleted) return false; // Allow back
         Alert.alert(
-          "Work in Progress",
-          "Tracking is active. You cannot leave this screen.",
+          t('labourer.trackingActiveTitle'),
+          t('labourer.trackingActiveMessage'),
         );
         return true; // Prevent back
       };
@@ -228,7 +230,7 @@ const WorkStatusScreen = () => {
                 isCompleted && styles.completedBadgeText,
               ]}
             >
-              {isCompleted ? "COMPLETED" : work.status}
+              {isCompleted ? t('status.completed') : work.status}
             </Text>
           </View>
         </View>
@@ -236,9 +238,9 @@ const WorkStatusScreen = () => {
         {/* Map View */}
         <View style={styles.mapCard}>
           <View style={styles.mapHeader}>
-            <Text style={styles.mapTitle}>Route to Work</Text>
+            <Text style={styles.mapTitle}>{t('labourer.routeToWork')}</Text>
             <Text style={styles.distanceText}>
-              {distance ? `${distance} km away` : "Locating..."}
+              {distance ? t('labourer.distanceAway', { distance }) : t('labourer.locating')}
             </Text>
           </View>
           <View style={styles.mapWrapper}>
@@ -286,7 +288,7 @@ const WorkStatusScreen = () => {
               }
             >
               <Navigation size={20} color="#FFF" />
-              <Text style={styles.navigateText}>Open Maps</Text>
+              <Text style={styles.navigateText}>{t('labourer.openMaps')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -295,7 +297,7 @@ const WorkStatusScreen = () => {
         {hasReached && !isCompleted && (
           <View style={styles.reachedCard}>
             <CheckCircle size={24} color="#4CAF50" />
-            <Text style={styles.reachedTitle}>You have arrived!</Text>
+            <Text style={styles.reachedTitle}>{t('labourer.arrivedTitle')}</Text>
           </View>
         )}
 
@@ -304,16 +306,15 @@ const WorkStatusScreen = () => {
         <View style={styles.card}>
           <Text style={styles.jobTitle}>{work.title}</Text>
           <Text style={styles.employerName}>
-            Employer: {work.employer?.name || "Unknown Employer"}
+            {t('labourer.employerLabel', { name: work.employer?.name || t('labourer.unknownEmployer') })}
           </Text>
           <View style={styles.divider} />
 
           {/* UPDATED: Safely extract bid amount from array */}
           <Text style={styles.earningsValue}>
-            Earnings: ₹
-            {work.bids && work.bids.length > 0
+            {t('labourer.earningsLabel', { amount: work.bids && work.bids.length > 0
               ? work.bids[0].bidAmount
-              : work.budget}
+              : work.budget })}
           </Text>
         </View>
 
@@ -323,12 +324,12 @@ const WorkStatusScreen = () => {
             if (work.employer?.phoneNo) {
               Linking.openURL(`tel:${work.employer.phoneNo}`);
             } else {
-              Alert.alert("Error", "No phone number available");
+              Alert.alert(t('common.error'), t('labourer.noPhoneAvailable'));
             }
           }}
         >
           <Phone size={20} color="#2196F3" />
-          <Text style={styles.contactButtonText}>Call Employer</Text>
+          <Text style={styles.contactButtonText}>{t('labourer.callEmployer')}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

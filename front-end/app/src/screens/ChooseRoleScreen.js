@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react"; // Added for loading state
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +16,7 @@ import {
 
 const ChooseRoleScreen = ({ userDetails }) => {
   const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
   const params = useLocalSearchParams();
   const registerUser = async (selectedRole) => {
     setLoading(true);
@@ -45,7 +47,7 @@ const ChooseRoleScreen = ({ userDetails }) => {
           console.log("Token stored successfully");
         }
 
-        Alert.alert("Success", "Account created successfully!");
+        Alert.alert(t('common.success'), t('auth.accountCreated'));
 
         // 2. Use the 'role' directly from the response for better reliability
         if (data.role === "LABOUR") {
@@ -55,13 +57,13 @@ const ChooseRoleScreen = ({ userDetails }) => {
         }
       } else {
         Alert.alert(
-          "Registration Failed",
-          data.message || "Something went wrong",
+          t('auth.registrationFailed'),
+          data.message || t('auth.somethingWentWrong'),
         );
       }
     } catch (error) {
       console.error("Registration Error:", error);
-      Alert.alert("Network Error", "Check your server connection.");
+      Alert.alert(t('auth.networkError'), t('auth.checkServerConnection'));
     } finally {
       setLoading(false);
     }
@@ -97,7 +99,7 @@ const ChooseRoleScreen = ({ userDetails }) => {
         resizeMode="cover"
       >
         <View style={styles.contentContainer}>
-          <Text style={styles.mainHeader}>Choose One</Text>
+          <Text style={styles.mainHeader}>{t('chooseRole.chooseOne')}</Text>
 
           <TouchableOpacity
             style={styles.optionContainer}
@@ -105,7 +107,7 @@ const ChooseRoleScreen = ({ userDetails }) => {
             onPress={handleSelectWorker}
             disabled={loading}
           >
-            <Text style={styles.optionLabel}>Want Work</Text>
+            <Text style={styles.optionLabel}>{t('chooseRole.wantWork')}</Text>
             <View style={styles.iconCircle}>
               <Image
                 source={require("../images/worker_icon.png")}
@@ -116,7 +118,7 @@ const ChooseRoleScreen = ({ userDetails }) => {
           </TouchableOpacity>
 
           <View style={styles.separatorContainer}>
-            <Text style={styles.separatorText}>OR</Text>
+            <Text style={styles.separatorText}>{t('chooseRole.or')}</Text>
           </View>
 
           <TouchableOpacity
@@ -125,7 +127,7 @@ const ChooseRoleScreen = ({ userDetails }) => {
             activeOpacity={0.8}
             disabled={loading}
           >
-            <Text style={styles.optionLabel}>Give Work</Text>
+            <Text style={styles.optionLabel}>{t('chooseRole.giveWork')}</Text>
             <View style={[styles.iconCircle, styles.blueBorder]}>
               <Image
                 source={require("../images/employer_icon.png")}

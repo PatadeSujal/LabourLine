@@ -2,17 +2,19 @@ import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { jwtDecode } from "jwt-decode";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 
 const WalletScreen = () => {
+  const { t } = useTranslation();
   const [walletData, setWalletData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -59,7 +61,7 @@ const WalletScreen = () => {
         const data = await response.json();
         setWalletData(data);
       } else {
-        Alert.alert("Error", "Failed to sync wallet data");
+        Alert.alert(t('common.error'), t('labourer.failedToSyncWallet'));
       }
     } catch (error) {
       console.error("Wallet Fetch Error:", error);
@@ -87,11 +89,11 @@ const WalletScreen = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.headerTitle}>My Wallet</Text>
+        <Text style={styles.headerTitle}>{t('wallet.myWallet')}</Text>
 
         {/* Balance Card - Mapping totalEarnings to Available Balance */}
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Available Balance</Text>
+          <Text style={styles.cardLabel}>{t('wallet.availableBalance')}</Text>
           <Text style={styles.cardBalance}>
             ₹ {walletData?.totalEarnings || "0"}
           </Text>
@@ -100,13 +102,13 @@ const WalletScreen = () => {
         {/* Stats Row */}
         <View style={styles.statsRow}>
           <View>
-            <Text style={styles.statLabel}>Total Earned</Text>
+            <Text style={styles.statLabel}>{t('wallet.totalEarned')}</Text>
             <Text style={styles.statValueGreen}>
               ₹ {walletData?.totalEarnings || "0"}
             </Text>
           </View>
           <View>
-            <Text style={styles.statLabel}>Total Points</Text>
+            <Text style={styles.statLabel}>{t('wallet.totalPoints')}</Text>
             <Text style={styles.statValueGreen}>
               {(walletData?.rating * 100).toFixed(0) || "0"}
             </Text>
@@ -114,7 +116,7 @@ const WalletScreen = () => {
         </View>
 
         {/* Recent Transactions Section */}
-        <Text style={styles.sectionTitle}>Recent Transaction</Text>
+        <Text style={styles.sectionTitle}>{t('wallet.recentTransaction')}</Text>
         <View style={styles.transactionsList}>
           {transactions.map((item) => (
             <View key={item.id} style={styles.transactionItem}>

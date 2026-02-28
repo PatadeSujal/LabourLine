@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
+import { router, useRootNavigationState } from "expo-router"; // <-- Import added
 import { jwtDecode } from "jwt-decode";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
@@ -8,9 +8,15 @@ import LanguageSelectionScreen from "./src/screens/LanguageSelection";
 export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
 
+  // 1. Get the current navigation state
+  const rootNavigationState = useRootNavigationState();
+
   useEffect(() => {
+    // 2. CRITICAL FIX: Do not run auth check until Expo Router is fully mounted
+    if (!rootNavigationState?.key) return;
+
     checkAuthStatus();
-  }, []);
+  }, [rootNavigationState?.key]); // 3. Re-run this effect when the router becomes ready
 
   const checkAuthStatus = async () => {
     try {
