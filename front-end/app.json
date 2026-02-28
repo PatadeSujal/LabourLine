@@ -40,6 +40,12 @@
     "plugins": [
       "expo-router",
       [
+        "expo-av",
+        {
+          "microphonePermission": "LabourLine needs access to your microphone to record voice descriptions for jobs."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "app/src/images/logo.png",

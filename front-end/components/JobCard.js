@@ -19,6 +19,7 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
   const { t } = useTranslation();
   const [distanceText, setDistanceText] = useState(t('jobCard.locating'));
   const [sound, setSound] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   // Helper to check if this is a bidding job
   const isBidding = job.isBiddingAllowed;
@@ -70,8 +71,26 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
       Alert.alert(t('jobCard.noAudio'), t('jobCard.noVoiceDescription'));
       return;
     }
+
+    // If already playing, stop it
+    if (sound) {
+      await sound.stopAsync();
+      await sound.unloadAsync();
+      setSound(null);
+      setIsPlaying(false);
+      return;
+    }
+
     try {
-      if (sound) await sound.unloadAsync();
+      // Set audio mode for playback (important for iOS silent mode & Android)
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+      });
+
+      setIsPlaying(true);
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: audioUrl },
         { shouldPlay: true },
@@ -81,19 +100,22 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
         if (status.didJustFinish) {
           await newSound.unloadAsync();
           setSound(null);
+          setIsPlaying(false);
         }
       });
     } catch (error) {
+      console.error("Audio playback error:", error, "URL:", audioUrl);
+      setIsPlaying(false);
       Alert.alert(t('common.error'), t('jobCard.couldNotPlayAudio'));
     }
   }
 
   useEffect(() => {
-    return sound
-      ? () => {
-          sound.unloadAsync();
-        }
-      : undefined;
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+    };
   }, [sound]);
 
   const getDuration = () => {
@@ -141,8 +163,8 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
               <Icon name="clock-outline" size={14} color="#555" />
               <Text style={styles.durationText}>{getDuration()}</Text>
             </View>
-            <TouchableOpacity style={styles.audioButton} onPress={playSound}>
-              <Icon name="volume-high" size={18} color="#1B1464" />
+            <TouchableOpacity style={[styles.audioButton, isPlaying && styles.audioPlaying]} onPress={playSound}>
+              <Icon name={isPlaying ? "stop-circle-outline" : "volume-high"} size={18} color={isPlaying ? "#fff" : "#1B1464"} />
             </TouchableOpacity>
           </View>
 
@@ -239,6 +261,7 @@ const styles = StyleSheet.create({
   },
   durationText: { fontSize: 12, color: "#555", marginLeft: 4 },
   audioButton: { padding: 2 },
+  audioPlaying: { backgroundColor: "#1B1464", borderRadius: 12, padding: 4 },
   footerRow: {
     flexDirection: "row",
     justifyContent: "space-between",

@@ -1,0 +1,25 @@
+# Build cache and artifacts
+android/build/
+android/.gradle/
+android/.kotlin/
+android/app/build/
+
+# Node modules (EAS installs them)
+# node_modules/
+
+# Local env files
+.env.local
+
+# IDE files
+.idea/
+.vscode/
+
+# Translation script (not needed for build)
+translate.js
+
+# Git
+.git/
+
+# OS files
+.DS_Store
+Thumbs.db
