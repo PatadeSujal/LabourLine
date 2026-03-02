@@ -5,7 +5,7 @@ android/.kotlin/
 android/app/build/
 
 # Node modules (EAS installs them)
-# node_modules/
+node_modules/
 
 # Local env files
 .env.local
