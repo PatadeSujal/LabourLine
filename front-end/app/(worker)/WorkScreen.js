@@ -1,39 +1,36 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { jwtDecode } from "jwt-decode"; // Make sure to install: npm install jwt-decode
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    RefreshControl,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 
 // COMPONENTS
+import BiddingModal from "../../components/BiddingModal";
 import JobCard from "../../components/JobCard";
 import CategoryFilterModal from "../../components/RenderModal";
 import i18n from "../../i18n";
 import { filterData } from "../src/store/WorkData";
 import {
-    getCurrentAddress,
-    getUserCoordinates,
+  getCurrentAddress,
+  getUserCoordinates,
 } from "../src/store/locationUtils";
 import { translateJobs } from "../src/store/translateService";
 import { acceptWorkApi, getActiveWorkApi } from "../src/store/workService";
 
 const WorkScreen = () => {
   const { t } = useTranslation();
-  const [searchQuery, setSearchQuery] = useState("");
   const [jobs, setJobs] = useState([]);
   const [originalJobs, setOriginalJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,14 +39,13 @@ const WorkScreen = () => {
     category: "",
     maxDistance: null,
     minEarning: null,
+    jobType: null, // 'bidding' or 'fixed'
   });
+  const [activeSort, setActiveSort] = useState(null);
 
   // --- BIDDING STATE ---
   const [bidModalVisible, setBidModalVisible] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
-  const [bidAmount, setBidAmount] = useState("");
-  const [bidComment, setBidComment] = useState("");
-  const [bidLoading, setBidLoading] = useState(false);
 
   // --- FILTER STATE ---
   const [modalVisible, setModalVisible] = useState(false);
@@ -157,7 +153,21 @@ const WorkScreen = () => {
   // --- 3. HANDLE ACTIONS ---
 
   // ACTION A: Accept Work (Existing Logic)
-  const handleAcceptWork = async (workId) => {
+  const handleAcceptWork = (workId) => {
+    Alert.alert(
+      t("labourer.confirmAccept") || "Confirm Acceptance",
+      t("labourer.oneJobLimitNote") || "You won't be able to accept other jobs until you complete this job. Do you want to proceed?",
+      [
+        { text: t("common.cancel") || "Cancel", style: "cancel" },
+        { 
+          text: t("common.yes") || "Yes, Accept", 
+          onPress: () => processAcceptWork(workId) 
+        }
+      ]
+    );
+  };
+
+  const processAcceptWork = async (workId) => {
     setLoading(true);
     try {
       // Call the generalized API function
@@ -178,64 +188,56 @@ const WorkScreen = () => {
     }
   };
 
-  // ACTION B: Submit Bid (New Logic)
-  const submitBid = async () => {
-    if (!bidAmount) {
-      Alert.alert(t('common.error'), t('labourer.pleaseEnterAmount'));
+
+  // --- 4. FILTERS & SORTING ---
+  const handleFilterSelection = async (label) => {
+    setModalVisible(false);
+
+    // 0. Handle Clearing Options
+    if (label === t("filterAndSort.clearSort", "Clear Sort")) {
+      setActiveSort(null);
+      return;
+    }
+    if (label === t("filterAndSort.clearFilter", "Clear Filter")) {
+      const resetFilters = {
+        category: "",
+        maxDistance: null,
+        minEarning: null,
+        jobType: null,
+      };
+      setActiveFilters(resetFilters);
+      setLoading(true);
+      fetchJobs(resetFilters);
       return;
     }
 
-    setBidLoading(true);
-    try {
-      const token = await AsyncStorage.getItem("userToken");
-      const decoded = jwtDecode(token);
-      const labourId = decoded.id; // Or however you store the ID
-
-      const payload = {
-        workId: selectedJob.id,
-        labourId: labourId,
-        bidAmount: parseFloat(bidAmount),
-        comment: bidComment,
-      };
-
-      const response = await fetch(
-        `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/labour/bid`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        },
-      );
-
-      if (response.ok) {
-        Alert.alert(t('common.success'), t('labourer.bidSent'));
-        setBidModalVisible(false);
-        setBidAmount("");
-        setBidComment("");
-      } else {
-        const errText = await response.text();
-        Alert.alert(t('common.error'), errText || t('labourer.failedToPlaceBid'));
-      }
-    } catch (error) {
-      console.error(error);
-      Alert.alert(t('common.error'), t('labourer.networkRequestFailed'));
-    } finally {
-      setBidLoading(false);
+    // 1. Handle Sorting Selection
+    if (
+      label === t("filterAndSort.distanceNearest", "Distance (Nearest)") ||
+      label === t("filterAndSort.priceLowToHigh", "Price (Low to High)") ||
+      label === t("filterAndSort.priceHighToLow", "Price (High to Low)")
+    ) {
+      setActiveSort(label);
+      return;
     }
-  };
 
-  // --- 4. FILTERS ---
-  const handleFilterSelection = async (label) => {
+    // 2. Handle Job Type Filter
+    if (label === t("filterAndSort.biddingOnly", "Bidding Allowed Only")) {
+      setActiveFilters({ ...activeFilters, jobType: "bidding" });
+      return;
+    }
+    if (label === t("filterAndSort.fixedPriceOnly", "Fixed Price Only")) {
+      setActiveFilters({ ...activeFilters, jobType: "fixed" });
+      return;
+    }
+
+    // 3. Handle Distance Selection
     console.log("Filter label ", label);
     const distanceMatch = label.match(/\d+/);
     console.log("Filter label ", distanceMatch);
     if (!distanceMatch) return;
 
     const distanceValue = parseInt(distanceMatch[0]);
-    setModalVisible(false);
     setLoading(true);
 
     try {
@@ -259,11 +261,40 @@ const WorkScreen = () => {
     }
   };
 
-  const filteredJobs = jobs.filter(
-    (job) =>
-      job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.category.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const getSortedJobs = () => {
+    let finalJobs = [...jobs];
+
+    // Filter by Job Type First
+    if (activeFilters.jobType === "bidding") {
+      finalJobs = finalJobs.filter((job) => job.isBiddingAllowed);
+    } else if (activeFilters.jobType === "fixed") {
+      finalJobs = finalJobs.filter((job) => !job.isBiddingAllowed);
+    }
+
+    if (activeSort === t("filterAndSort.distanceNearest", "Distance (Nearest)")) {
+      finalJobs.sort((a, b) => {
+        const distA = parseFloat(a.distance || 0);
+        const distB = parseFloat(b.distance || 0);
+        return distA - distB;
+      });
+    } else if (activeSort === t("filterAndSort.priceLowToHigh", "Price (Low to High)")) {
+      finalJobs.sort((a, b) => {
+        const priceA = parseFloat(a.budget || a.salary || 0);
+        const priceB = parseFloat(b.budget || b.salary || 0);
+        return priceA - priceB;
+      });
+    } else if (activeSort === t("filterAndSort.priceHighToLow", "Price (High to Low)")) {
+      finalJobs.sort((a, b) => {
+        const priceA = parseFloat(a.budget || a.salary || 0);
+        const priceB = parseFloat(b.budget || b.salary || 0);
+        return priceB - priceA;
+      });
+    }
+
+    return finalJobs;
+  };
+
+  const filteredJobs = getSortedJobs();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -301,27 +332,47 @@ const WorkScreen = () => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.searchContainer}>
-          <Icon
-            name="search-outline"
-            size={20}
-            color="#888"
-            style={styles.searchIcon}
-          />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={t('labourer.searchJobs')}
-            placeholderTextColor="#999"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
+        <View style={styles.actionContainer}>
           <TouchableOpacity
+            style={styles.actionButton}
             onPress={() => {
-              setCurrentOptions(filterData.distance);
+              setCurrentOptions([
+                { id: "clear_f", label: t("filterAndSort.clearFilter", "Clear Filter"), color: "#666" },
+                { id: "fb1", label: t("filterAndSort.biddingOnly", "Bidding Allowed Only"), color: "#8E24AA" },
+                { id: "fb2", label: t("filterAndSort.fixedPriceOnly", "Fixed Price Only"), color: "#E65100" },
+                ...filterData.distance
+              ]);
               setModalVisible(true);
             }}
           >
-            <Icon name="filter-outline" size={20} color="#555" />
+            <Icon name="filter-outline" size={20} color="#0D47A1" />
+            <Text style={styles.actionButtonText}>
+              {t("filterAndSort.filterBy", "Filter By")}
+            </Text>
+            {(activeFilters.maxDistance || activeFilters.jobType) && (
+              <View style={styles.activeDot} />
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => {
+              setCurrentOptions([
+                { id: "clear_s", label: t("filterAndSort.clearSort", "Clear Sort"), color: "#666" },
+                { id: "s1", label: t("filterAndSort.distanceNearest", "Distance (Nearest)"), color: "#0D47A1" },
+                { id: "s2", label: t("filterAndSort.priceLowToHigh", "Price (Low to High)"), color: "#2ecc71" },
+                { id: "s3", label: t("filterAndSort.priceHighToLow", "Price (High to Low)"), color: "#e74c3c" },
+              ]);
+              setModalVisible(true);
+            }}
+          >
+            <Icon name="swap-vertical" size={20} color="#0D47A1" />
+            <Text style={styles.actionButtonText}>
+              {t("filterAndSort.sortBy", "Sort By")}
+            </Text>
+            {activeSort && (
+              <View style={styles.activeDot} />
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -351,7 +402,6 @@ const WorkScreen = () => {
                 mainText={job.isBiddingAllowed ? t('labourer.bidNow') : t('labourer.accept')}
                 onPressAction={(job) => {
                   setSelectedJob(job);
-                  setBidAmount(job.budget ? job.budget.toString() : "");
                   setBidModalVisible(true);
                 }}
               />
@@ -363,60 +413,15 @@ const WorkScreen = () => {
       )}
 
       {/* --- BIDDING MODAL --- */}
-      <Modal
-        animationType="slide"
-        transparent={true}
+      <BiddingModal
         visible={bidModalVisible}
-        onRequestClose={() => setBidModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{t('labourer.placeYourBid')}</Text>
-            <Text style={styles.modalSubtitle}>
-              {t('labourer.budgetLabel', { amount: selectedJob?.budget || selectedJob?.earning || 'N/A' })}
-            </Text>
-
-            <Text style={styles.label}>{t('labourer.yourOffer')}</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="numeric"
-              placeholder={t('labourer.offerPlaceholder')}
-              value={bidAmount}
-              onChangeText={setBidAmount}
-            />
-
-            <Text style={styles.label}>{t('labourer.commentOptional')}</Text>
-            <TextInput
-              style={[styles.input, { height: 80, textAlignVertical: "top" }]}
-              multiline
-              placeholder={t('labourer.commentPlaceholder')}
-              value={bidComment}
-              onChangeText={setBidComment}
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.btn, styles.btnCancel]}
-                onPress={() => setBidModalVisible(false)}
-              >
-                <Text style={styles.btnTextCancel}>{t('common.cancel')}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.btn, styles.btnSubmit]}
-                onPress={submitBid}
-                disabled={bidLoading}
-              >
-                {bidLoading ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.btnTextSubmit}>{t('labourer.sendBid')}</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setBidModalVisible(false)}
+        job={selectedJob}
+        onSuccess={() => {
+          // Optional: refresh jobs or update UI after successful bid
+          fetchJobs(activeFilters);
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -478,27 +483,41 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#fff",
   },
-  searchContainer: {
+  actionContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 5,
+  },
+  actionButton: {
+    flex: 1,
     flexDirection: "row",
     backgroundColor: "#fff",
-    borderRadius: 15,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    borderRadius: 12,
+    paddingVertical: 12,
     alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 5,
     elevation: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    position: "relative",
   },
-  searchIcon: {
-    marginRight: 10,
+  actionButtonText: {
+    marginLeft: 8,
+    color: "#0D47A1",
+    fontWeight: "bold",
+    fontSize: 15,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: "#000",
-    paddingVertical: 2,
+  activeDot: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 8,
+    height: 8,
+    backgroundColor: "red",
+    borderRadius: 4,
   },
   contentContainer: {
     flex: 1,
@@ -511,72 +530,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  // --- MODAL STYLES (ADDED) ---
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: "white",
-    borderRadius: 15,
-    padding: 20,
-    elevation: 5,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#333",
-    textAlign: "center",
-    marginBottom: 5,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  label: {
-    fontWeight: "600",
-    marginBottom: 5,
-    color: "#333",
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 16,
-    marginBottom: 15,
-    backgroundColor: "#f9f9f9",
-  },
-  modalButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 10,
-  },
-  btn: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    marginHorizontal: 5,
-  },
-  btnCancel: {
-    backgroundColor: "#eee",
-  },
-  btnSubmit: {
-    backgroundColor: "#FF9F43",
-  },
-  btnTextCancel: {
-    color: "#333",
-    fontWeight: "bold",
-  },
-  btnTextSubmit: {
-    color: "white",
-    fontWeight: "bold",
-  },
+
 });
 
 export default WorkScreen;

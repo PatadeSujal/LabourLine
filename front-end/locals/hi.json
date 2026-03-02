@@ -206,6 +206,8 @@
     "bidNow": "अभी बोली लगाएं",
     "accept": "स्वीकार करें",
     "pleaseEnterAmount": "कृपया एक राशि दर्ज करें",
+    "oneJobLimitNote": "नोट: यदि आपकी बोली स्वीकार कर ली जाती है, तो आप इस काम को पूरा करने तक अन्य काम स्वीकार नहीं कर पाएंगे।",
+    "confirmAccept": "स्वीकृति की पुष्टि करें",
     "fetchProfileError": "प्रोफ़ाइल डेटा प्राप्त करने में विफल",
     "unableToConnect": "सर्वर से कनेक्ट करने में असमर्थ",
     "failedToSyncWallet": "वॉलेट डेटा सिंक करने में विफल",
@@ -253,5 +255,16 @@
     "profile": "प्रोफ़ाइल",
     "findWork": "काम खोजें",
     "map": "मैप"
+  },
+  "filterAndSort": {
+    "clearFilter": "फ़िल्टर साफ़ करें",
+    "clearSort": "सॉर्ट साफ़ करें",
+    "distanceNearest": "दूरी (निकटतम)",
+    "priceLowToHigh": "कीमत (कम से ज्यादा)",
+    "priceHighToLow": "कीमत (ज्यादा से कम)",
+    "biddingOnly": "केवल बोली वाले काम",
+    "fixedPriceOnly": "केवल निश्चित मूल्य वाले काम",
+    "filterBy": "फ़िल्टर करें",
+    "sortBy": "सॉर्ट करें"
   }
 }

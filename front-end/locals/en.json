@@ -206,6 +206,8 @@
     "bidNow": "Bid Now",
     "accept": "Accept",
     "pleaseEnterAmount": "Please enter an amount",
+    "oneJobLimitNote": "Note: You won't be able to accept other jobs until you complete this job.",
+    "confirmAccept": "Confirm Acceptance",
     "fetchProfileError": "Failed to fetch profile data",
     "unableToConnect": "Unable to connect to server",
     "failedToSyncWallet": "Failed to sync wallet data",
@@ -253,5 +255,16 @@
     "profile": "Profile",
     "findWork": "Find Work",
     "map": "Map"
+  },
+  "filterAndSort": {
+    "clearFilter": "Clear Filter",
+    "clearSort": "Clear Sort",
+    "distanceNearest": "Distance (Nearest)",
+    "priceLowToHigh": "Price (Low to High)",
+    "priceHighToLow": "Price (High to Low)",
+    "biddingOnly": "Bidding Allowed Only",
+    "fixedPriceOnly": "Fixed Price Only",
+    "filterBy": "Filter By",
+    "sortBy": "Sort By"
   }
 }

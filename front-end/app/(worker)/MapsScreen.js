@@ -1,6 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
+import { router } from "expo-router";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Dimensions,
@@ -11,10 +13,10 @@ import {
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import BiddingModal from "../../components/BiddingModal";
 import JobCard from "../../components/JobCard";
 import { getUserCoordinates } from "../src/store/locationUtils";
 import { acceptWorkApi } from "../src/store/workService";
-import { useTranslation } from "react-i18next";
 
 const { width, height } = Dimensions.get("window");
 
@@ -99,6 +101,10 @@ const MapsScreen = () => {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [jobs, setJobs] = useState([]); // State for API data
   const [loading, setLoading] = useState(true);
+  
+  // Bidding Modal State
+  const [bidModalVisible, setBidModalVisible] = useState(false);
+  const [selectedJobBidding, setSelectedJobBidding] = useState(null);
 
   const fetchMapJobs = async () => {
     try {
@@ -146,7 +152,21 @@ const MapsScreen = () => {
     })();
   }, []);
 
-  const handleAcceptWork = async (workId) => {
+  const handleAcceptWork = (workId) => {
+    Alert.alert(
+      t("labourer.confirmAccept") || "Confirm Acceptance",
+      t("labourer.oneJobLimitNote") || "You won't be able to accept other jobs until you complete this job. Do you want to proceed?",
+      [
+        { text: t("common.cancel") || "Cancel", style: "cancel" },
+        { 
+          text: t("common.yes") || "Yes, Accept", 
+          onPress: () => processAcceptWork(workId) 
+        }
+      ]
+    );
+  };
+
+  const processAcceptWork = async (workId) => {
     setLoading(true);
     try {
       // Call the generalized API function
@@ -199,55 +219,47 @@ const MapsScreen = () => {
         )}
 
         {/* 2. Plot Dynamic Jobs from the 'jobs' state */}
-        {jobs.map((job) => (
-          <Marker
-            key={job.id}
-            coordinate={{
-              latitude: parseFloat(job.latitude),
-              longitude: parseFloat(job.longitude),
-            }}
-            onPress={() => setSelectedMarker(job)}
-            anchor={{ x: 0.5, y: 1.0 }}
-          >
-            <View
-              style={[
-                styles.markerContainer,
-                selectedMarker?.id === job.id && styles.markerSelected,
-              ]}
+        {jobs.map((job) => {
+          // Safety check: ensure coordinates exist and are valid numbers
+          const lat = parseFloat(job.latitude);
+          const lng = parseFloat(job.longitude);
+          if (isNaN(lat) || isNaN(lng)) return null;
+
+          return (
+            <Marker
+              key={job.id}
+              coordinate={{ latitude: lat, longitude: lng }}
+              onPress={() => setSelectedMarker(job)}
+              anchor={{ x: 0.5, y: 1.0 }}
             >
-              <View style={styles.priceBubble}>
-                <Text style={styles.priceText}>
-                  ₹{job.earning || job.salary}
-                </Text>
-              </View>
               <View
                 style={[
-                  styles.pinCircle,
-                  selectedMarker?.id === job.id && styles.pinCircleSelected,
+                  styles.markerContainer,
+                  selectedMarker?.id === job.id && styles.markerSelected,
                 ]}
               >
-                <Icon
-                  name={job.category === "Electrical" ? "flash" : "hammer"}
-                  size={24}
-                  color={selectedMarker?.id === job.id ? "#fff" : "#007AFF"}
-                />
+                <View style={styles.priceBubble}>
+                  <Text style={styles.priceText}>
+                    ₹{job.budget || job.salary || 0}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.pinCircle,
+                    selectedMarker?.id === job.id && styles.pinCircleSelected,
+                  ]}
+                >
+                  <Icon
+                    name={job.category === "Electrical" ? "flash" : "hammer"}
+                    size={24}
+                    color={selectedMarker?.id === job.id ? "#fff" : "#007AFF"}
+                  />
+                </View>
+                <View style={[styles.arrow, selectedMarker?.id === job.id && styles.arrowSelected]} />
               </View>
-              <View style={styles.arrow} />
-              <View
-                style={[
-                  styles.pinCircle,
-                  selectedMarker?.id === job.id && styles.pinCircleSelected,
-                ]}
-              >
-                <Icon
-                  name={job.category === "Electrical" ? "flash" : "hammer"}
-                  size={24}
-                  color={selectedMarker?.id === job.id ? "#fff" : "#007AFF"}
-                />
-              </View>
-            </View>
-          </Marker>
-        ))}
+            </Marker>
+          );
+        })}
       </MapView>
 
       {/* 3. Job Details Overlay */}
@@ -258,10 +270,31 @@ const MapsScreen = () => {
             onPress={() => setSelectedMarker(null)}
           />
           <View style={styles.bottomSheet}>
-            <JobCard job={selectedMarker} />
+            <JobCard 
+              job={selectedMarker} 
+              onAccept={handleAcceptWork}
+              mainText={selectedMarker.isBiddingAllowed ? t('labourer.bidNow') : t('labourer.accept')}
+              onPressAction={(job) => {
+                // Open bidding modal instead of navigating
+                setSelectedJobBidding(job);
+                setBidModalVisible(true);
+              }}
+            />
           </View>
         </View>
       )}
+
+      {/* 4. Bidding Modal */}
+      <BiddingModal
+        visible={bidModalVisible}
+        onClose={() => setBidModalVisible(false)}
+        job={selectedJobBidding}
+        onSuccess={() => {
+          // Refresh jobs from map or just dismiss
+          fetchMapJobs();
+          setSelectedMarker(null);
+        }}
+      />
     </View>
   );
 };
@@ -278,77 +311,66 @@ const styles = StyleSheet.create({
   markerContainer: {
     alignItems: "center",
     justifyContent: "center",
-    // Removed fixed width/height to allow the bubble to breathe
-    padding: 5,
+    width: 80, // Giving it enough width so the bubble doesn't clip
+    overflow: "visible", 
   },
   priceBubble: {
     backgroundColor: "#FF9F43",
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 12,
-    // Add zIndex to ensure it's on top of the icon
     zIndex: 10,
-    marginBottom: -2, // Pull it slightly closer to the icon
-    elevation: 5, // For Android shadow
-    shadowColor: "#000", // For iOS shadow
+    elevation: 6, 
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  arrow: {
-    width: 0,
-    height: 0,
-    backgroundColor: "transparent",
-    borderStyle: "solid",
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 10,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderTopColor: "#fff", // Match your pinCircle background
-    marginTop: -2, // Pull up to connect with the circle
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    marginBottom: -8, // Pull slightly down into the circle 
   },
   priceText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "bold",
     color: "#fff",
+    textAlign: "center",
   },
   pinCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
-    elevation: 8,
+    elevation: 5,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
-    shadowRadius: 5,
-    zIndex: 1,
+    shadowRadius: 4,
+    zIndex: 2,
     borderWidth: 2,
     borderColor: "#007AFF",
+    marginTop: 4,
   },
   pinCircleSelected: {
     backgroundColor: "#007AFF",
     borderColor: "#FF9F43",
     borderWidth: 3,
   },
-  arrowBorder: {
-    backgroundColor: "transparent",
-    borderColor: "transparent",
-    borderTopColor: "rgba(0,0,0,0.15)",
-    borderWidth: 10,
-    alignSelf: "center",
-    marginTop: -2,
-  },
   arrow: {
+    width: 0,
+    height: 0,
     backgroundColor: "transparent",
-    borderColor: "transparent",
-    borderTopColor: "#fff",
-    borderWidth: 10,
-    alignSelf: "center",
-    marginTop: -20,
+    borderStyle: "solid",
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 12,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: "#007AFF", // Match border of pinCircle
+    marginTop: -2, // Pull up to seamlessly connect
+    zIndex: 1,
+  },
+  arrowSelected: {
+    borderTopColor: "#FF9F43",
   },
   jobDetailsContainer: {
     position: "absolute",

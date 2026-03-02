@@ -2,17 +2,17 @@ import { Audio } from "expo-av";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  Image,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    Image,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import {
-  calculateDistance,
-  getUserCoordinates,
+    calculateDistance,
+    getUserCoordinates,
 } from "../app/src/store/locationUtils";
 
 const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
@@ -125,6 +125,33 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
     return job.duration || t('jobCard.defaultDuration');
   };
 
+  const getStatusBadgeStyle = () => {
+    const status = (job.status || "OPEN").toUpperCase();
+    if (status === "OPEN" || status === "ACTIVE") return { backgroundColor: "#FFEBEE", borderColor: "#FF5252" }; // Red
+    if (status === "ACCEPTED" || status === "IN_PROGRESS") return { backgroundColor: "#E8F5E9", borderColor: "#4CAF50" }; // Green
+    if (status === "COMPLETED") return { backgroundColor: "#F5F5F5", borderColor: "#BDBDBD" }; // Grey
+    return { backgroundColor: "#F5F5F5", borderColor: "#999" };
+  };
+
+  const getStatusTextStyle = () => {
+    const status = (job.status || "OPEN").toUpperCase();
+    if (status === "OPEN" || status === "ACTIVE") return { color: "#D32F2F" }; // Dark Red
+    if (status === "ACCEPTED" || status === "IN_PROGRESS") return { color: "#2E7D32" }; // Dark Green
+    if (status === "COMPLETED") return { color: "#757575" }; // Dark Grey
+    return { color: "#999" };
+  };
+
+  const getStatusText = () => {
+    const status = (job.status || "OPEN").toUpperCase();
+    if (status === "OPEN" || status === "ACTIVE") return t('common.active') || "Active";
+    if (status === "ACCEPTED") return t('status.accepted') || "Accepted";
+    if (status === "IN_PROGRESS") return t('status.inProgress') || "In Progress";
+    if (status === "COMPLETED") return t('status.completed') || "Completed";
+    
+    // Fallback if status is something weird but postedTime exists
+    return job.postedTime || status; 
+  };
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
@@ -133,7 +160,11 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
             {job.skillsRequired || job.category || t('common.general')}
           </Text>
         </View>
-        <Text style={styles.timeText}>{job.postedTime || t('common.active')}</Text>
+        <View style={[styles.statusBadge, getStatusBadgeStyle()]}>
+          <Text style={[styles.statusBadgeText, getStatusTextStyle()]}>
+            {getStatusText()}
+          </Text>
+        </View>
       </View>
 
       <View style={styles.contentRow}>
@@ -226,7 +257,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   tagText: { color: "#E65100", fontSize: 11, fontWeight: "bold" },
-  timeText: { color: "#999", fontSize: 11 },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: "bold",
+    textTransform: "uppercase",
+  },
   contentRow: { flexDirection: "row" },
   imageContainer: { position: "relative", marginRight: 12 },
   jobImage: {

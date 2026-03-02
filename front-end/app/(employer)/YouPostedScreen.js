@@ -5,15 +5,15 @@ import { jwtDecode } from "jwt-decode";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-    ActivityIndicator,
-    Alert,
-    RefreshControl,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import JobCard from "../../components/JobCard";
 
@@ -101,8 +101,8 @@ const YouPostedScreen = () => {
     console.log("Handling Action for Job ID:", work.id);
     console.log("Is Bidding Allowed?", work.isBiddingAllowed);
 
-    // CASE 1: Bidding is NO LONGER allowed -> Go to Status Screen
-    if (!work.isBiddingAllowed || work.status == "ACCEPTED") {
+    // CASE 1: Bidding is NO LONGER allowed OR job is completed -> Go to Status Screen
+    if (!work.isBiddingAllowed || work.status === "ACCEPTED" || work.status === "COMPLETED") {
       router.push({
         pathname: "/src/screens/EmployerWorkStatusScreen",
         params: {
@@ -149,8 +149,8 @@ const YouPostedScreen = () => {
                 key={item.id}
                 job={item}
                 // 1. DYNAMIC BUTTON TEXT
-                // If bidding is allowed, show "View Bids", else "View Status"
-                mainText={item.isBiddingAllowed ? t('employer.viewBids') : t('employer.viewStatus')}
+                // If job is completed or accepted, show "View Status"; if bidding allowed, show "View Bids"
+                mainText={item.status === "COMPLETED" || item.status === "ACCEPTED" || !item.isBiddingAllowed ? t('employer.viewStatus') : t('employer.viewBids')}
                 // 2. ACTION HANDLERS
                 // JobCard calls 'onPressAction' if isBiddingAllowed is true
                 onPressAction={() => handleViewStatus(item)}

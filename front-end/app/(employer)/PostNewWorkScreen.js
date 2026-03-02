@@ -349,6 +349,7 @@ const PostNewWorkScreen = () => {
               <TextInput
                 style={styles.input}
                 placeholder={t('employer.jobTitlePlaceholder')}
+                placeholderTextColor="#999"
                 value={jobTitle}
                 onChangeText={setJobTitle}
               />
@@ -436,6 +437,7 @@ const PostNewWorkScreen = () => {
                 placeholder={
                   allowBidding ? t('employer.biddingPlaceholder') : t('employer.fixedPlaceholder')
                 }
+                placeholderTextColor="#999"
                 keyboardType="numeric"
                 value={amount}
                 onChangeText={setAmount}
@@ -560,6 +562,7 @@ const PostNewWorkScreen = () => {
                 <TextInput
                   style={styles.input}
                   placeholder={t('employer.enterFullAddress')}
+                  placeholderTextColor="#999"
                   value={address}
                   onChangeText={setAddress}
                   multiline

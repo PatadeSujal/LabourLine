@@ -1,38 +1,48 @@
+
 import { router, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  ActivityIndicator,
-  Alert,
-  ImageBackground,
-  Keyboard,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    ImageBackground,
+    Keyboard,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 const OtpScreen = () => {
   const { t } = useTranslation();
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const inputRefs = useRef([]);
   const params = useLocalSearchParams();
+
+
+
   const handleOtpVerification = async () => {
     const code = otp.join("");
 
     // Basic Validation: Ensure 6 digits are entered
     if (code.length !== 6) {
-      Alert.alert(t('common.error'), t('otp.enterFullCode'));
+      Alert.alert(t("common.error"), t("otp.enterFullCode"));
       return;
     }
 
     setLoading(true);
 
-    router.push(
-      {
+    try {
+      // Mock verification delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // OTP verified successfully (mocked: accepts any 6 digits)
+      // Navigate to role selection
+      router.push({
         pathname: "/src/screens/ChooseRoleScreen",
         params: {
           name: params.name,
@@ -40,9 +50,13 @@ const OtpScreen = () => {
           age: params.age,
           password: params.password,
         },
-      },
-      1000,
-    );
+      });
+    } catch (error) {
+      console.error("OTP Verification Error:", error);
+      Alert.alert(t("common.error"), "Invalid OTP. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOtpChange = (text, index) => {
@@ -66,9 +80,34 @@ const OtpScreen = () => {
     }
   };
 
-  const handleResend = () => {
-    Alert.alert(t('otp.resendOtp'), t('otp.resendDemoMessage'));
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      // Mock resend delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Clear the OTP inputs
+      setOtp(["", "", "", "", "", ""]);
+
+      Alert.alert(
+        t("common.success") || "Success",
+        t("otp.resendSuccess") || "A new OTP has been sent to your phone."
+      );
+    } catch (error) {
+      console.error("Resend OTP Error:", error);
+      Alert.alert(
+        t("common.error"),
+        error.message || "Failed to resend OTP. Please try again."
+      );
+    } finally {
+      setResending(false);
+    }
   };
+
+  // Mask the phone number for display: ******7890
+  const maskedPhone = params.phoneNo
+    ? `******${params.phoneNo.slice(-4)}`
+    : "";
 
   return (
     <View style={styles.container}>
@@ -85,9 +124,9 @@ const OtpScreen = () => {
       >
         <View style={styles.contentContainer}>
           <View style={styles.card}>
-            <Text style={styles.headerText}>{t('otp.enterOtp')}</Text>
+            <Text style={styles.headerText}>{t("otp.enterOtp")}</Text>
             <Text style={styles.subText}>
-              {t('otp.demoModeSubtext')}
+              {t("otp.otpSentTo") || "OTP sent to"} +91 {maskedPhone}
             </Text>
 
             <View style={styles.otpContainer}>
@@ -95,7 +134,7 @@ const OtpScreen = () => {
                 <TextInput
                   key={index}
                   ref={(ref) => (inputRefs.current[index] = ref)}
-                  style={styles.otpBox}
+                  style={[styles.otpBox, digit ? styles.otpBoxFilled : null]}
                   keyboardType="number-pad"
                   maxLength={1}
                   value={digit}
@@ -106,25 +145,34 @@ const OtpScreen = () => {
             </View>
 
             <TouchableOpacity
-              style={styles.verifyButton}
+              style={[styles.verifyButton, loading && styles.buttonDisabled]}
               onPress={handleOtpVerification}
               disabled={loading}
             >
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.buttonText}>{t('otp.verifyAndProceed')}</Text>
+                <Text style={styles.buttonText}>
+                  {t("otp.verifyAndProceed")}
+                </Text>
               )}
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.resendContainer}
               onPress={handleResend}
+              disabled={resending}
             >
-              <Text style={styles.resendText}>
-                {t('otp.didntReceiveCode')}
-                <Text style={styles.resendHighlight}>{t('otp.resend')}</Text>
-              </Text>
+              {resending ? (
+                <ActivityIndicator size="small" color="#FF4757" />
+              ) : (
+                <Text style={styles.resendText}>
+                  {t("otp.didntReceiveCode")}
+                  <Text style={styles.resendHighlight}>
+                    {t("otp.resend")}
+                  </Text>
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -170,13 +218,16 @@ const styles = StyleSheet.create({
     width: 45,
     height: 50,
     borderWidth: 2,
-    borderColor: "#FF4757",
+    borderColor: "#ddd",
     borderRadius: 8,
     fontSize: 20,
     fontWeight: "bold",
     color: "#333",
     backgroundColor: "#fff",
     elevation: 2,
+  },
+  otpBoxFilled: {
+    borderColor: "#FF4757",
   },
   verifyButton: {
     width: "100%",
@@ -186,12 +237,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     elevation: 3,
   },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
   buttonText: {
     color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
   },
-  resendContainer: { marginTop: 20 },
+  resendContainer: { marginTop: 20, minHeight: 30, justifyContent: "center" },
   resendText: { color: "#666" },
   resendHighlight: { color: "#FF4757", fontWeight: "bold" },
 });

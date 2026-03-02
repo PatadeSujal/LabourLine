@@ -253,5 +253,16 @@
     "profile": "ਪ੍ਰੋਫਾਈਲ",
     "findWork": "ਕੰਮ ਲੱਭੋ",
     "map": "ਨਕਸ਼ਾ"
+  },
+  "filterAndSort": {
+    "clearFilter": "Clear Filter",
+    "clearSort": "Clear Sort",
+    "distanceNearest": "Distance (Nearest)",
+    "priceLowToHigh": "Price (Low to High)",
+    "priceHighToLow": "Price (High to Low)",
+    "biddingOnly": "Bidding Allowed Only",
+    "fixedPriceOnly": "Fixed Price Only",
+    "filterBy": "Filter By",
+    "sortBy": "Sort By"
   }
 }

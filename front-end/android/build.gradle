@@ -23,3 +23,11 @@ allprojects {
 
 apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject"
+
+subprojects { subproject ->
+    subproject.plugins.withId('com.android.library') {
+        subproject.android {
+            compileSdk = 36
+        }
+    }
+}
