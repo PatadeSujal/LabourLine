@@ -34,5 +34,5 @@ EXPOSE 8080
 # Here is the magic: We copy the REAL app jar from the build stage's build/libs/ folder
 COPY --from=build /app/build/libs/*.jar app.jar
 
-# Run the Spring Boot application
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Run the Spring Boot application (forcing IPv4 to fix Supabase connection errors)
+ENTRYPOINT ["java", "-Djava.net.preferIPv4Stack=true", "-jar", "app.jar"]
