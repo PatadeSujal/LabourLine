@@ -37,7 +37,15 @@ const ChooseRoleScreen = ({ userDetails }) => {
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (e) {
+        console.error("Failed to parse response:", text);
+        Alert.alert(t('auth.registrationFailed'), "Server returned an invalid response.");
+        return;
+      }
 
       if (response.ok) {
         // Correctly accessing 'token' from your JSON response

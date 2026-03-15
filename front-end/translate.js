@@ -11,11 +11,10 @@ const fs = require("fs");
 const path = require("path");
 
 // ========================================
-// 🔑 PASTE YOUR AZURE CREDENTIALS HERE
+// 🔑 MYMEMORY EMAIL FOR HIGHER RATE LIMITS
 // ========================================
-const AZURE_KEY = process.env.EXPO_PUBLIC_AZURE_TRANSLATOR_KEY;
-const AZURE_REGION = process.env.EXPO_PUBLIC_AZURE_TRANSLATOR_REGION; // Change to your region (e.g., "global", "eastus", "westeurope")
-const AZURE_ENDPOINT = "https://api.cognitive.microsofttranslator.com";
+const MYMEMORY_EMAIL = process.env.EXPO_PUBLIC_MYMEMORY_EMAIL;
+const MYMEMORY_ENDPOINT = "https://api.mymemory.translated.net/get";
 
 // Languages to generate
 const TARGET_LANGUAGES = [
@@ -85,61 +84,60 @@ function restoreVariables(text, vars) {
 }
 
 /**
- * Call Azure Translator API to translate a batch of texts
- * Azure allows up to 100 texts per request
+ * Call MyMemory API to translate a single text
  */
-async function translateBatch(texts, targetLang) {
-  const body = texts.map((t) => ({ Text: t }));
+async function translateText(text, targetLang) {
+  let url = `${MYMEMORY_ENDPOINT}?q=${encodeURIComponent(text)}&langpair=en|${targetLang}`;
+  
+  if (MYMEMORY_EMAIL) {
+    url += `&de=${encodeURIComponent(MYMEMORY_EMAIL)}`;
+  }
 
-  const url = `${AZURE_ENDPOINT}/translate?api-version=3.0&from=en&to=${targetLang}`;
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Ocp-Apim-Subscription-Key": AZURE_KEY,
-      "Ocp-Apim-Subscription-Region": AZURE_REGION,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
+  const response = await fetch(url);
+  
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`Azure API Error (${response.status}): ${err}`);
+    throw new Error(`MyMemory API Error (${response.status}): ${err}`);
   }
 
   const data = await response.json();
-  return data.map((d) => d.translations[0].text);
+  
+  // MyMemory returns translated text in responseData.translatedText
+  if (data.responseStatus !== 200 && data.responseStatus !== "200") {
+     throw new Error(`MyMemory API Error (${data.responseStatus}): ${data.responseDetails}`);
+  }
+
+  return data.responseData.translatedText;
 }
 
 /**
  * Translate all strings for a single target language
  */
 async function translateForLanguage(strings, targetLang) {
-  const BATCH_SIZE = 50; // Azure supports up to 100, using 50 for safety
   const translatedStrings = [];
 
-  // Protect variables before sending to Azure
+  // Protect variables before sending to translation
   const protectedTexts = strings.map((s) => protectVariables(s.value));
 
-  for (let i = 0; i < protectedTexts.length; i += BATCH_SIZE) {
-    const batch = protectedTexts.slice(i, i + BATCH_SIZE);
-    const batchTexts = batch.map((b) => b.text);
+  for (let i = 0; i < protectedTexts.length; i++) {
+    const b = protectedTexts[i];
 
-    console.log(`    Translating batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(protectedTexts.length / BATCH_SIZE)}...`);
+    console.log(`    Translating ${i + 1}/${protectedTexts.length}...`);
 
-    const translated = await translateBatch(batchTexts, targetLang);
+    let translatedText = "";
+    try {
+      translatedText = await translateText(b.text, targetLang);
+    } catch(err) {
+      console.error(`      Error on text "${b.text}": ${err.message}`);
+      translatedText = b.text; // fallback
+    }
 
     // Restore variables
-    for (let j = 0; j < translated.length; j++) {
-      const restored = restoreVariables(translated[j], batch[j].vars);
-      translatedStrings.push(restored);
-    }
+    const restored = restoreVariables(translatedText, b.vars);
+    translatedStrings.push(restored);
 
     // Small delay to avoid rate limiting
-    if (i + BATCH_SIZE < protectedTexts.length) {
-      await new Promise((r) => setTimeout(r, 500));
-    }
+    await new Promise((r) => setTimeout(r, 100));
   }
 
   return translatedStrings;
@@ -149,7 +147,7 @@ async function translateForLanguage(strings, targetLang) {
  * Main execution
  */
 async function main() {
-  console.log("🌐 Azure Translator - LabourLine Translation Generator\n");
+  console.log("🌐 MyMemory Translator - LabourLine Translation Generator\n");
 
   // Collect all strings from en.json
   const strings = collectStrings(enJson);

@@ -1,8 +1,58 @@
 import i18n from "../../../i18n";
 
-const AZURE_KEY = process.env.EXPO_PUBLIC_AZURE_TRANSLATOR_KEY;
-const AZURE_REGION = process.env.EXPO_PUBLIC_AZURE_TRANSLATOR_REGION;
-const AZURE_ENDPOINT = "https://api.cognitive.microsofttranslator.com";
+const MYMEMORY_EMAIL = process.env.EXPO_PUBLIC_MYMEMORY_EMAIL;
+const MYMEMORY_ENDPOINT = "https://api.mymemory.translated.net/get";
+
+// In-memory cache for translations to avoid hitting API repeatedly
+// Format: cache['targetLang']['originalText'] = 'translatedText'
+const translationCache = {};
+
+/**
+ * Helper function to translate a single string using MyMemory API
+ */
+async function translateString(text, targetLang) {
+  if (!text || !text.trim()) return text;
+
+  // Initialize language cache if missing
+  if (!translationCache[targetLang]) {
+    translationCache[targetLang] = {};
+  }
+
+  // Check cache first
+  if (translationCache[targetLang][text]) {
+    return translationCache[targetLang][text];
+  }
+
+  let url = `${MYMEMORY_ENDPOINT}?q=${encodeURIComponent(text)}&langpair=en|${targetLang}`;
+  
+  if (MYMEMORY_EMAIL) {
+    url += `&de=${encodeURIComponent(MYMEMORY_EMAIL)}`;
+  }
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.warn("MyMemory API error:", response.status);
+      return text; // Return original on error
+    }
+
+    const data = await response.json();
+    if (data.responseStatus !== 200 && data.responseStatus !== "200") {
+      console.warn("MyMemory API inner error:", data.responseDetails);
+      return text;
+    }
+
+    const translatedText = data.responseData.translatedText;
+    
+    // Save to cache
+    translationCache[targetLang][text] = translatedText;
+    
+    return translatedText;
+  } catch (err) {
+    console.warn("Translation failed, using original:", err.message);
+    return text; // Return original on network error
+  }
+}
 
 /**
  * Translate an array of texts to the currently selected language.
@@ -18,50 +68,19 @@ export async function translateTexts(texts) {
     return texts;
   }
 
-  // Filter out empty/null texts, keeping track of indices
-  const validEntries = [];
-  const results = [...texts];
-
-  texts.forEach((text, index) => {
-    if (text && text.trim()) {
-      validEntries.push({ index, text });
-    }
-  });
-
-  if (validEntries.length === 0) return results;
-
   try {
-    const body = validEntries.map((e) => ({ Text: e.text }));
-
-    const response = await fetch(
-      `${AZURE_ENDPOINT}/translate?api-version=3.0&from=en&to=${currentLang}`,
-      {
-        method: "POST",
-        headers: {
-          "Ocp-Apim-Subscription-Key": AZURE_KEY,
-          "Ocp-Apim-Subscription-Region": AZURE_REGION,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      }
-    );
-
-    if (!response.ok) {
-      console.warn("Azure Translate API error:", response.status);
-      return results; // Return originals on error
+    const allTranslated = [];
+    for (let i = 0; i < texts.length; i++) {
+      const translated = await translateString(texts[i], currentLang);
+      allTranslated.push(translated);
+      
+      // Add a 50ms delay between API calls to protect the free tier quota
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
-
-    const data = await response.json();
-
-    // Map translated texts back to their original positions
-    data.forEach((item, i) => {
-      results[validEntries[i].index] = item.translations[0].text;
-    });
-
-    return results;
+    return allTranslated;
   } catch (error) {
-    console.warn("Translation failed, using originals:", error.message);
-    return results; // Return originals on network error
+    console.warn("Batch translation failed, using originals:", error.message);
+    return texts;
   }
 }
 
@@ -77,7 +96,7 @@ export async function translateJobs(jobs) {
     return jobs;
   }
 
-  // Collect all translatable texts from all jobs in one batch
+  // Collect all translatable texts from all jobs
   const textsToTranslate = [];
   const mapping = []; // tracks which text belongs to which job & field
 
@@ -94,34 +113,15 @@ export async function translateJobs(jobs) {
   if (textsToTranslate.length === 0) return jobs;
 
   try {
-    // Azure allows up to 100 texts per request, batch if needed
-    const BATCH_SIZE = 50;
+    // Execute translations sequentially with a tiny delay to prevent 429 Rate Limits
     const allTranslated = [];
-
-    for (let i = 0; i < textsToTranslate.length; i += BATCH_SIZE) {
-      const batch = textsToTranslate.slice(i, i + BATCH_SIZE);
-      const body = batch.map((t) => ({ Text: t }));
-
-      const response = await fetch(
-        `${AZURE_ENDPOINT}/translate?api-version=3.0&from=en&to=${currentLang}`,
-        {
-          method: "POST",
-          headers: {
-            "Ocp-Apim-Subscription-Key": AZURE_KEY,
-            "Ocp-Apim-Subscription-Region": AZURE_REGION,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        }
-      );
-
-      if (!response.ok) {
-        console.warn("Azure Translate API error:", response.status);
-        return jobs; // Return originals on error
-      }
-
-      const data = await response.json();
-      allTranslated.push(...data.map((d) => d.translations[0].text));
+    for (let i = 0; i < textsToTranslate.length; i++) {
+      const text = textsToTranslate[i];
+      const translated = await translateString(text, currentLang);
+      allTranslated.push(translated);
+      
+      // Add a 50ms delay between API calls to protect the free tier quota
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
 
     // Create translated copies of jobs
