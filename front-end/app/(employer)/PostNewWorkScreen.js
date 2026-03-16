@@ -217,36 +217,37 @@ const PostNewWorkScreen = () => {
         finalLng = 73.8567;
       }
 
-      // 2. Media Upload Logic — Azure Blob Storage
-      const uploadAudioToAzure = async (uri) => {
-        const STORAGE_ACCOUNT = process.env.EXPO_PUBLIC_AZURE_STORAGE_ACCOUNT;
-        const CONTAINER = process.env.EXPO_PUBLIC_AZURE_STORAGE_CONTAINER;
-        const SAS_TOKEN = process.env.EXPO_PUBLIC_AZURE_STORAGE_SAS;
+      // 2. Media Upload Logic — Cloudinary
+      const uploadAudioToCloudinary = async (uri) => {
+        const CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME;
+        const UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
-        const fileName = `audio_${Date.now()}.m4a`;
-        const uploadUrl = `https://${STORAGE_ACCOUNT}.blob.core.windows.net/${CONTAINER}/${fileName}?${SAS_TOKEN}`;
+        const data = new FormData();
+        data.append("file", {
+          uri: uri,
+          type: "audio/m4a",
+          name: `audio_${Date.now()}.m4a`,
+        });
+        data.append("upload_preset", UPLOAD_PRESET);
+        data.append("resource_type", "video"); // Cloudinary treats audio as 'video' resource type
 
         try {
-          const response = await fetch(uri);
-          const blob = await response.blob();
-
-          const uploadResponse = await fetch(uploadUrl, {
-            method: "PUT",
-            headers: {
-              "x-ms-blob-type": "BlockBlob",
-              "Content-Type": "audio/m4a",
+          const response = await fetch(
+            `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`,
+            {
+              method: "POST",
+              body: data,
             },
-            body: blob,
-          });
+          );
 
-          if (uploadResponse.ok) {
-            // Return URL with SAS token for read access (Azure student packs block anonymous access)
-            return `https://${STORAGE_ACCOUNT}.blob.core.windows.net/${CONTAINER}/${fileName}?${SAS_TOKEN}`;
+          const result = await response.json();
+          if (response.ok) {
+            return result.secure_url;
           }
-          console.error("Azure upload failed:", uploadResponse.status);
+          console.error("Cloudinary upload failed:", result.error?.message);
           return "none";
         } catch (error) {
-          console.error("Azure upload error:", error);
+          console.error("Cloudinary upload error:", error);
           return "none";
         }
       };
@@ -255,7 +256,7 @@ const PostNewWorkScreen = () => {
       let finalImageUrl =
         "https://img.freepik.com/free-vector/construction-worker-concept-illustration_114360-5093.jpg";
 
-      if (audioUri) finalAudioUrl = await uploadAudioToAzure(audioUri);
+      if (audioUri) finalAudioUrl = await uploadAudioToCloudinary(audioUri);
       if (image) {
         const imgbbUrl = await uploadToImgBB(image);
         if (imgbbUrl) finalImageUrl = imgbbUrl;
