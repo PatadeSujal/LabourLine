@@ -372,7 +372,7 @@ const PostNewWorkScreen = () => {
               <Text
                 style={[styles.dropdownText, !category && { color: "#999" }]}
               >
-                {category || t('common.select')}
+                {category ? t(`workData.${category}`, { defaultValue: category }) : t('common.select')}
               </Text>
             </TouchableOpacity>
           </View>

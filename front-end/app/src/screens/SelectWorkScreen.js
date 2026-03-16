@@ -136,7 +136,7 @@ const SelectWorkScreen = () => {
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.headerText}>{categoryTitle}</Text>
+          <Text style={styles.headerText}>{t(`workData.${categoryTitle}`, { defaultValue: categoryTitle })}</Text>
 
           <View style={styles.tagsContainer}>
             {subRoles.length > 0 ? (
@@ -155,7 +155,7 @@ const SelectWorkScreen = () => {
                     onPress={() => toggleSelection(role.id)}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.buttonText}>{role.label}</Text>
+                    <Text style={styles.buttonText}>{t(`workData.${role.label}`, { defaultValue: role.label })}</Text>
                     {isSelected && (
                       <View style={styles.iconContainer}>
                         <Icon name="check" size={18} color="#fff" />

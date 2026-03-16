@@ -46,7 +46,7 @@ const CategoryFilterModal = ({ visible, onClose, categories, onSelect, title }) 
                     { backgroundColor: item.color || "#0D47A1" },
                   ]}
                 />
-                <Text style={styles.categoryItemText}>{item.label}</Text>
+                <Text style={styles.categoryItemText}>{t(`workData.${item.label}`, { defaultValue: item.label })}</Text>
               </TouchableOpacity>
             )}
           />

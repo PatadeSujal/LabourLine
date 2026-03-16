@@ -56,8 +56,8 @@ const SelectCategoryScreen = () => {
                 onPress={() => handleCategorySelect(item)}
                 activeOpacity={0.8}
               >
-                {/* Use the specific label defined in your data */}
-                <Text style={styles.buttonText}>{item.label}</Text>
+                {/* Use the dynamically translated label */}
+                <Text style={styles.buttonText}>{t(`workData.${item.label}`, { defaultValue: item.label })}</Text>
               </TouchableOpacity>
             ))}
           </View>

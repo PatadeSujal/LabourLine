@@ -1,8 +1,5 @@
-# Build cache and artifacts
-android/build/
-android/.gradle/
-android/.kotlin/
-android/app/build/
+android/
+ios/
 
 # Node modules (EAS installs them)
 node_modules/

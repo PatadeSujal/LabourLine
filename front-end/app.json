@@ -4,8 +4,8 @@
     "slug": "LabourLine",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./images/app-icon.png",
-    "logo": "./images/app-icon.png",
+    "icon": "./app/src/images/app-logo-sm.png",
+    "logo": "./app/src/images/app-logo-sm.png",
     "scheme": "labourline",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -18,7 +18,7 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "app/src/images/android-icon-foreground.png",
+        "foregroundImage": "./app/src/images/app-logo-sm.png",
         "backgroundImage": "app/src/images/android-icon-background.png",
         "monochromeImage": "app/src/images/android-icon-monochrome.png"
       },
@@ -35,7 +35,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./app/src/images/app-logo-sm.png"
     },
     "plugins": [
       "expo-router",
@@ -48,7 +48,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "app/src/images/logo.png",
+          "image": "./app/src/images/app-logo-sm.png",
           "imageWidth": 200,
           "resizeMode": "cover",
           "backgroundColor": "#FED8A8",
