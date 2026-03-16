@@ -1,0 +1,8 @@
+front-end/node_modules/
+front-end/.expo/
+front-end/android/
+front-end/ios/
+front-end/dist/
+backend/node_modules/
+backend/build/
+backend/.gradle/
