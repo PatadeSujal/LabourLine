@@ -15,6 +15,7 @@ import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import BiddingModal from "../../components/BiddingModal";
 import JobCard from "../../components/JobCard";
+import JobDetailModal from "../../components/JobDetailModal";
 import { getUserCoordinates } from "../src/store/locationUtils";
 import { acceptWorkApi } from "../src/store/workService";
 
@@ -105,6 +106,10 @@ const MapsScreen = () => {
   // Bidding Modal State
   const [bidModalVisible, setBidModalVisible] = useState(false);
   const [selectedJobBidding, setSelectedJobBidding] = useState(null);
+
+  // Job Detail Modal State
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [selectedJobDetail, setSelectedJobDetail] = useState(null);
 
   const fetchMapJobs = async () => {
     try {
@@ -279,6 +284,10 @@ const MapsScreen = () => {
                 setSelectedJobBidding(job);
                 setBidModalVisible(true);
               }}
+              onCardPress={(job) => {
+                setSelectedJobDetail(job);
+                setDetailModalVisible(true);
+              }}
             />
           </View>
         </View>
@@ -293,6 +302,22 @@ const MapsScreen = () => {
           // Refresh jobs from map or just dismiss
           fetchMapJobs();
           setSelectedMarker(null);
+        }}
+      />
+
+      {/* 5. Job Detail Modal */}
+      <JobDetailModal
+        visible={detailModalVisible}
+        onClose={() => setDetailModalVisible(false)}
+        job={selectedJobDetail}
+        onAccept={(id) => {
+          setDetailModalVisible(false);
+          handleAcceptWork(id);
+        }}
+        onBid={(job) => {
+          setDetailModalVisible(false);
+          setSelectedJobBidding(job);
+          setBidModalVisible(true);
         }}
       />
     </View>

@@ -15,7 +15,14 @@
     "select": "A button on a Remote Control",
     "next": "नंतर",
     "active": "सक्रिय",
-    "general": "सामान्य"
+    "general": "सामान्य",
+    "close": "बंद करा",
+    "jobDetails": "कामाचे तपशील",
+    "noAudio": "ऑडिओ नाही",
+    "noVoiceDescription": "या कामासाठी व्हॉइस वर्णन नाही.",
+    "couldNotPlayAudio": "ऑडिओ प्ले करू शकलो नाही.",
+    "hrs": "तास",
+    "km": "किमी"
   },
   "status": {
     "open": "उघडा",
@@ -116,7 +123,9 @@
     "failedToUpdate": "स्थिती अपडेट करण्यात अयशस्वी.",
     "phoneNotAvailable": "फोन नंबर उपलब्ध नाही.",
     "jobTitleLabel": "जॉबचे शीर्षक",
-    "jobTitlePlaceholder": "e. g. हलविण्यात मदत करा",
+    "jobTitlePlaceholder": "e. g. सामान हलविण्यात मदत करा",
+    "descriptionLabel": "तपशील",
+    "descriptionPlaceholder": "उदा. रंगकाम असल्यास खोलीचा आकार, ग्रिलचे काम असल्यास खिडकीची लांबी लिहा",
     "categoryLabel": "वर्ग",
     "pricingModel": "किंमत मॉडेल",
     "fixedPrice": "निश्चित किंमत",

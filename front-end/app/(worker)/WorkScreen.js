@@ -19,6 +19,7 @@ import Icon from "react-native-vector-icons/Ionicons";
 // COMPONENTS
 import BiddingModal from "../../components/BiddingModal";
 import JobCard from "../../components/JobCard";
+import JobDetailModal from "../../components/JobDetailModal";
 import CategoryFilterModal from "../../components/RenderModal";
 import i18n from "../../i18n";
 import { filterData } from "../src/store/WorkData";
@@ -46,6 +47,10 @@ const WorkScreen = () => {
   // --- BIDDING STATE ---
   const [bidModalVisible, setBidModalVisible] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
+
+  // --- JOB DETAIL MODAL STATE ---
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [selectedJobDetail, setSelectedJobDetail] = useState(null);
 
   // --- FILTER STATE ---
   const [modalVisible, setModalVisible] = useState(false);
@@ -404,6 +409,10 @@ const WorkScreen = () => {
                   setSelectedJob(job);
                   setBidModalVisible(true);
                 }}
+                onCardPress={(job) => {
+                  setSelectedJobDetail(job);
+                  setDetailModalVisible(true);
+                }}
               />
             ))
           ) : (
@@ -420,6 +429,22 @@ const WorkScreen = () => {
         onSuccess={() => {
           // Optional: refresh jobs or update UI after successful bid
           fetchJobs(activeFilters);
+        }}
+      />
+
+      {/* --- JOB DETAIL MODAL --- */}
+      <JobDetailModal
+        visible={detailModalVisible}
+        onClose={() => setDetailModalVisible(false)}
+        job={selectedJobDetail}
+        onAccept={(id) => {
+          setDetailModalVisible(false);
+          handleAcceptWork(id);
+        }}
+        onBid={(job) => {
+          setDetailModalVisible(false);
+          setSelectedJob(job);
+          setBidModalVisible(true);
         }}
       />
     </SafeAreaView>

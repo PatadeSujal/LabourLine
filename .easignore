@@ -1,7 +1,17 @@
-front-end/node_modules/
-front-end/.expo/
-front-end/android/
-front-end/ios/
-front-end/dist/
-backend/
-.git/
+# Mobile Source Only
+android/
+ios/
+node_modules/
+.expo/
+dist/
+
+# Exclude sibling folders in the repo
+../backend/
+../.git/
+
+# Translation and labels
+translate.js
+extractLabels.js
+applyTranslations.js
+node_modules/
+

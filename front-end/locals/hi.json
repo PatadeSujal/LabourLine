@@ -15,7 +15,14 @@
     "select": "चुनें",
     "next": "अगला",
     "active": "सक्रिय",
-    "general": "सामान्य"
+    "general": "सामान्य",
+    "close": "बंद करें",
+    "jobDetails": "काम का विवरण",
+    "noAudio": "कोई ऑडियो नहीं",
+    "noVoiceDescription": "इस काम के लिए कोई वॉयस विवरण नहीं है।",
+    "couldNotPlayAudio": "ऑडियो प्ले नहीं किया जा सका।",
+    "hrs": "घंटे",
+    "km": "किमी"
   },
   "status": {
     "open": "खुला",
@@ -117,6 +124,8 @@
     "phoneNotAvailable": "फ़ोन नंबर उपलब्ध नहीं है।",
     "jobTitleLabel": "काम का शीर्षक",
     "jobTitlePlaceholder": "जैसे सामान उठाने में मदद",
+    "descriptionLabel": "विवरण",
+    "descriptionPlaceholder": "जैसे रंगने का काम हो तो कमरे का आकार, ग्रिल का काम हो तो खिड़की की लंबाई लिखें",
     "categoryLabel": "श्रेणी",
     "pricingModel": "मूल्य निर्धारण मॉडल",
     "fixedPrice": "निश्चित मूल्य",

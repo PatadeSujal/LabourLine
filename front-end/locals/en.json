@@ -15,7 +15,14 @@
     "select": "Select",
     "next": "Next",
     "active": "Active",
-    "general": "General"
+    "general": "General",
+    "close": "Close",
+    "jobDetails": "Job Details",
+    "noAudio": "No Audio",
+    "noVoiceDescription": "No voice description.",
+    "couldNotPlayAudio": "Could not play audio.",
+    "hrs": "Hrs",
+    "km": "km"
   },
   "status": {
     "open": "OPEN",
@@ -117,6 +124,8 @@
     "phoneNotAvailable": "Phone number not available.",
     "jobTitleLabel": "JOB TITLE",
     "jobTitlePlaceholder": "e.g Help with moving",
+    "descriptionLabel": "DESCRIPTION",
+    "descriptionPlaceholder": "e.g. Put size of room if coloring work, length of window if grill work",
     "categoryLabel": "CATEGORY",
     "pricingModel": "PRICING MODEL",
     "fixedPrice": "Fixed Price",
@@ -232,17 +241,13 @@
     "totalPoints": "Total Points",
     "recentTransaction": "Recent Transaction"
   },
+
   "jobCard": {
     "budget": "Budget",
     "earning": "Earning",
     "bidNow": "Bid Now",
     "accept": "Accept",
     "locating": "Locating...",
-    "noAudio": "No Audio",
-    "noVoiceDescription": "This job has no voice description.",
-    "couldNotPlayAudio": "Could not play audio.",
-    "hrs": "Hrs",
-    "km": "km",
     "defaultDuration": "8 Hrs",
     "defaultLocation": "Pune"
   },

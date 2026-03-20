@@ -3,9 +3,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio } from "expo-av";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { jwtDecode } from "jwt-decode";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
@@ -30,6 +30,14 @@ import {
 
 const PostNewWorkScreen = () => {
   const { t } = useTranslation();
+  const params = useLocalSearchParams();
+  
+  // --- EDIT STATE ---
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editJobId, setEditJobId] = useState(null);
+  const [existingImage, setExistingImage] = useState(null);
+  const [existingAudioUrl, setExistingAudioUrl] = useState(null);
+
   // --- FORM STATE ---
   const [jobTitle, setJobTitle] = useState("");
   const [category, setCategory] = useState("");
@@ -52,6 +60,39 @@ const PostNewWorkScreen = () => {
   const [recording, setRecording] = useState(null);
   const [audioUri, setAudioUri] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
+
+  // --- POPULATE EDIT DATA ---
+  useEffect(() => {
+    if (params?.editJob) {
+      try {
+        const parsedJob = JSON.parse(params.editJob);
+        setIsEditMode(true);
+        setEditJobId(parsedJob.id);
+
+        setJobTitle(parsedJob.title || "");
+        // Only set category if it was selected, otherwise allow selecting
+        if (parsedJob.category || parsedJob.skillsRequired) {
+             setCategory(parsedJob.category || parsedJob.skillsRequired);
+        }
+        setAmount(parsedJob.budget?.toString() || parsedJob.salary?.toString() || "");
+        
+        // Remove "Duration: X hrs." from description if previously appended by a formatted view,
+        // although backend stores raw description. 
+        setDescription(parsedJob.description || "");
+        
+        setAllowBidding(parsedJob.isBiddingAllowed || false);
+        setAddress(parsedJob.location || "");
+
+        // Preserve URLs
+        if (parsedJob.image) setExistingImage(parsedJob.image);
+        if (parsedJob.audioUrl && parsedJob.audioUrl !== "none") {
+          setExistingAudioUrl(parsedJob.audioUrl);
+        }
+      } catch (error) {
+        console.error("Failed to parse editJob params", error);
+      }
+    }
+  }, [params?.editJob]);
 
   // --- AUDIO & IMAGE FUNCTIONS ---
   async function startRecording() {
@@ -256,10 +297,17 @@ const PostNewWorkScreen = () => {
       let finalImageUrl =
         "https://img.freepik.com/free-vector/construction-worker-concept-illustration_114360-5093.jpg";
 
-      if (audioUri) finalAudioUrl = await uploadAudioToCloudinary(audioUri);
+      if (audioUri) {
+        finalAudioUrl = await uploadAudioToCloudinary(audioUri);
+      } else if (existingAudioUrl) {
+        finalAudioUrl = existingAudioUrl;
+      }
+      
       if (image) {
         const imgbbUrl = await uploadToImgBB(image);
         if (imgbbUrl) finalImageUrl = imgbbUrl;
+      } else if (existingImage) {
+        finalImageUrl = existingImage;
       }
 
       // 3. CONSTRUCT PAYLOAD
@@ -283,10 +331,14 @@ const PostNewWorkScreen = () => {
 
       console.log("Posting Payload:", payload);
 
-      const response = await fetch(
-        `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/employer/post-work`,
-        {
-          method: "POST",
+      const endpoint = isEditMode
+        ? `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/employer/update-work/${editJobId}`
+        : `${process.env.EXPO_PUBLIC_FRONTEND_API_URL}/employer/post-work`;
+
+      const method = isEditMode ? "PUT" : "POST";
+
+      const response = await fetch(endpoint, {
+          method: method,
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
@@ -296,9 +348,11 @@ const PostNewWorkScreen = () => {
       );
 
       if (response.ok) {
-        Alert.alert(t('common.success'), t('employer.workPosted'), [
-          { text: t('common.ok'), onPress: () => router.replace("YouPostedScreen") },
-        ]);
+        Alert.alert(
+          t('common.success'), 
+          isEditMode ? t('employer.workUpdated', { defaultValue: "Job updated successfully!" }) : t('employer.workPosted'), 
+          [{ text: t('common.ok'), onPress: () => router.replace("YouPostedScreen") }]
+        );
       } else {
         const err = await response.text();
         Alert.alert(t('common.error'), t('employer.serverError') + err);
@@ -328,8 +382,8 @@ const PostNewWorkScreen = () => {
       >
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerTitle}>{t('employer.postNewWork')}</Text>
-            <Text style={styles.headerSubtitle}>{t('employer.hireSkillInSeconds')}</Text>
+            <Text style={styles.headerTitle}>{isEditMode ? t('employer.editWork', { defaultValue: "Edit Work" }) : t('employer.postNewWork')}</Text>
+            <Text style={styles.headerSubtitle}>{isEditMode ? t('employer.updateDetails', { defaultValue: "Update your job details" }) : t('employer.hireSkillInSeconds')}</Text>
           </View>
           <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
             <MaterialIcons name="logout" size={24} color="#fff" />
@@ -353,6 +407,29 @@ const PostNewWorkScreen = () => {
                 placeholderTextColor="#999"
                 value={jobTitle}
                 onChangeText={setJobTitle}
+              />
+            </View>
+          </View>
+
+          {/* 1.5 JOB DESCRIPTION */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>{t('employer.descriptionLabel')}</Text>
+            <View style={[styles.inputWrapper, styles.multilineWrapper]}>
+              <MaterialIcons
+                name="description"
+                size={20}
+                color="#0D47A1"
+                style={[styles.inputIcon, { marginTop: 12, alignSelf: 'flex-start' }]}
+              />
+              <TextInput
+                style={[styles.input, styles.multilineInput]}
+                placeholder={t('employer.descriptionPlaceholder')}
+                placeholderTextColor="#999"
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
               />
             </View>
           </View>
@@ -589,9 +666,11 @@ const PostNewWorkScreen = () => {
                   style={{ marginRight: 8 }}
                 />
                 <Text style={styles.submitButtonText}>
-                  {allowBidding
-                    ? t('employer.postAndWaitForBids')
-                    : t('employer.postFixedPriceJob')}
+                  {isEditMode 
+                    ? t('employer.updateJob', { defaultValue: "Update Job" })
+                    : allowBidding
+                      ? t('employer.postAndWaitForBids')
+                      : t('employer.postFixedPriceJob')}
                 </Text>
               </>
             )}
@@ -637,6 +716,14 @@ const styles = StyleSheet.create({
   },
   inputIcon: { marginLeft: 12 },
   input: { flex: 1, padding: 10, fontSize: 16, color: "#000" },
+  multilineWrapper: {
+    height: 100,
+    alignItems: "flex-start",
+  },
+  multilineInput: {
+    height: 90,
+    paddingTop: 10,
+  },
   dropdown: {
     flexDirection: "row",
     alignItems: "center",

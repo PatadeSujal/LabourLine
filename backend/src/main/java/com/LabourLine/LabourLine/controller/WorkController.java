@@ -64,6 +64,44 @@ public class WorkController {
         return ResponseEntity.ok(savedWork);
     }
 
+    @PutMapping("/employer/update-work/{workId}")
+    public ResponseEntity<?> updateWork(
+            @PathVariable Long workId,
+            @RequestBody WorkDto request) {
+
+        // 1. Find the Work to update
+        Optional<Work> workOpt = workRepository.findById(workId);
+        if (workOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body("Work not found with ID: " + workId);
+        }
+        Work existingWork = workOpt.get();
+
+        // 2. Verify that the Employer requesting the update is the owner
+        if (!existingWork.getEmployer().getId().equals(request.getEmployerId())) {
+            return ResponseEntity.status(403).body("You are not authorized to update this work.");
+        }
+
+        // 3. Update the allowed fields (only if provided in DTO, though simple override here is fine)
+        if (request.getTitle() != null) existingWork.setTitle(request.getTitle());
+        if (request.getDescription() != null) existingWork.setDescription(request.getDescription());
+        if (request.getSkillsRequired() != null) existingWork.setSkillsRequired(request.getSkillsRequired());
+        
+        // Update Pricing/Bidding details
+        if (request.getBudget() != null) existingWork.setBudget(request.getBudget());
+        existingWork.setBiddingAllowed(request.isBiddingAllowed());
+
+        // Update Location & Media
+        if (request.getLocation() != null) existingWork.setLocation(request.getLocation());
+        if (request.getLatitude() != null) existingWork.setLatitude(request.getLatitude());
+        if (request.getLongitude() != null) existingWork.setLongitude(request.getLongitude());
+        if (request.getImage() != null) existingWork.setImage(request.getImage());
+        if (request.getAudioUrl() != null) existingWork.setAudioUrl(request.getAudioUrl());
+
+        // 4. Save and return updated entity
+        Work savedWork = workRepository.save(existingWork);
+        return ResponseEntity.ok(savedWork);
+    }
+
    @GetMapping("/labour/open-work")
     public ResponseEntity<List<Work>> getOpenWork(
             @RequestParam(required = false) Double maxDistance,

@@ -1,12 +1,12 @@
-name: Build and Deploy to Docker Hub
+name: Build and Deploy to Render
 
 on:
   push:
     branches:
-      - main  # Change to 'master' if your default branch is master
+      - main
 
 jobs:
-  build-and-push:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,6 +22,9 @@ jobs:
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v4
         with:
-          context: ./backend    # <--- This is the crucial change!
+          context: ./backend
           push: true
           tags: patadesujal/labour-line-deployment:latest
+
+      - name: Trigger Render Deploy
+        run: curl -s "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"

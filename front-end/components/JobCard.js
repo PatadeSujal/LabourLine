@@ -15,7 +15,7 @@ import {
     getUserCoordinates,
 } from "../app/src/store/locationUtils";
 
-const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
+const JobCard = ({ job, onAccept, onPressAction, mainText, onCardPress, showEditIcon, onEditPress }) => {
   const { t } = useTranslation();
   const [distanceText, setDistanceText] = useState(t('jobCard.locating'));
   const [sound, setSound] = useState(null);
@@ -51,7 +51,7 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
             job.latitude,
             job.longitude,
           );
-          setDistanceText(`${dist} ${t('jobCard.km')}`);
+          setDistanceText(`${dist} ${t('common.km')}`);
         } else if (isMounted) {
           setDistanceText(job.location ? job.location.split(",")[0] : t('jobCard.defaultLocation'));
         }
@@ -68,7 +68,7 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
   async function playSound() {
     const audioUrl = job.audioUrl;
     if (!audioUrl || audioUrl === "none") {
-      Alert.alert(t('jobCard.noAudio'), t('jobCard.noVoiceDescription'));
+      Alert.alert(t('common.noAudio'), t('common.noVoiceDescription'));
       return;
     }
 
@@ -106,7 +106,7 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
     } catch (error) {
       console.error("Audio playback error:", error, "URL:", audioUrl);
       setIsPlaying(false);
-      Alert.alert(t('common.error'), t('jobCard.couldNotPlayAudio'));
+      Alert.alert(t('common.error'), t('common.couldNotPlayAudio'));
     }
   }
 
@@ -120,7 +120,7 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
 
   const getDuration = () => {
     if (job.description?.includes("Duration:")) {
-      return job.description.split(".")[0].replace("Duration: ", "") + " " + t('jobCard.hrs');
+      return job.description.split(".")[0].replace("Duration: ", "") + " " + t('common.hrs');
     }
     return job.duration || t('jobCard.defaultDuration');
   };
@@ -153,12 +153,23 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
   };
 
   return (
-    <View style={styles.card}>
+    <TouchableOpacity 
+      style={styles.card} 
+      activeOpacity={0.9} 
+      onPress={() => onCardPress && onCardPress(job)}
+    >
       <View style={styles.cardHeader}>
-        <View style={styles.tagContainer}>
-          <Text style={styles.tagText}>
-            {job.skillsRequired || job.category || t('common.general')}
-          </Text>
+        <View style={{flexDirection: "row", alignItems: "center"}}>
+          <View style={styles.tagContainer}>
+            <Text style={styles.tagText}>
+              {job.skillsRequired || job.category || t('common.general')}
+            </Text>
+          </View>
+          {showEditIcon && (
+            <TouchableOpacity onPress={onEditPress} style={{ marginLeft: 8, padding: 4 }}>
+              <Icon name="pencil" size={16} color="#666" />
+            </TouchableOpacity>
+          )}
         </View>
         <View style={[styles.statusBadge, getStatusBadgeStyle()]}>
           <Text style={[styles.statusBadgeText, getStatusTextStyle()]}>
@@ -225,7 +236,7 @@ const JobCard = ({ job, onAccept, onPressAction, mainText }) => {
           </View>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 

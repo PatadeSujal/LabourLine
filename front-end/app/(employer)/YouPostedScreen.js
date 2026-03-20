@@ -156,6 +156,14 @@ const YouPostedScreen = () => {
                 onPressAction={() => handleViewStatus(item)}
                 // JobCard calls 'onAccept' if mainText is "View Status"
                 onAccept={() => handleViewStatus(item)}
+                // 3. EDIT HANDLERS
+                showEditIcon={item.status === "OPEN"}
+                onEditPress={() => {
+                  router.push({
+                    pathname: "/(employer)/PostNewWorkScreen",
+                    params: { editJob: JSON.stringify(item) }
+                  });
+                }}
               />
             ))
           ) : (

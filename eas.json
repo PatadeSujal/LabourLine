@@ -1,0 +1,22 @@
+{
+  "build": {
+    "preview": {
+      "channel": "preview",
+      "android": {
+        "buildType": "apk",
+        "resourceClass": "medium"
+      },
+      "env": {
+        "EXPO_PUBLIC_FRONTEND_API_URL": "https://labourline-g3g8chh2ctdfazfb.southeastasia-01.azurewebsites.net"
+      }
+    },
+    "production": {
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_FRONTEND_API_URL": "https://labourline-g3g8chh2ctdfazfb.southeastasia-01.azurewebsites.net"
+      }
+    }
+  }
+}
+
+
