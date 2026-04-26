@@ -18,7 +18,6 @@ public class JwtUtils {
                 .claim("id", user.getId()) // ID stored here
                 .claim("role", user.getRole().name())
                 .setIssuedAt(new Date()) 
-                .setExpiration(new Date(System.currentTimeMillis() + 86400000))
                 .signWith(Keys.hmacShaKeyFor(SECRET.getBytes()))
                 .compact();
     }
